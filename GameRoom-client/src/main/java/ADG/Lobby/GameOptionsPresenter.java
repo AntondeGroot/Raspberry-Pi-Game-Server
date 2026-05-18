@@ -22,6 +22,7 @@ public class GameOptionsPresenter implements Presenter {
     private HandlerRegistration confirmReg;
     private HandlerRegistration cancelReg;
     private final ArrayList<GameOption> preloadedOptions;
+    private boolean stopped = false;
 
     public GameOptionsPresenter(GameOptionsView view, Room room, PresenterManager presenterManager, RoomServiceAsync roomService) {
         this(view, room, presenterManager, roomService, null);
@@ -46,7 +47,7 @@ public class GameOptionsPresenter implements Presenter {
             roomService.getGameOptions(room.getGameId(), new AsyncCallback<ArrayList<GameOption>>() {
                 @Override public void onFailure(Throwable t) {}
                 @Override public void onSuccess(ArrayList<GameOption> options) {
-                    showOptionsAfterLoadingTranslations(options);
+                    if (!stopped) showOptionsAfterLoadingTranslations(options);
                 }
             });
         }
@@ -62,13 +63,14 @@ public class GameOptionsPresenter implements Presenter {
             baseUrl = protocol + "//" + host + "/" + room.getGameId();
             GWT.log("Using public baseUrl for translations: " + baseUrl);
         }
-        GameTranslations.load(baseUrl, Cookie.getLanguage(), () ->
-            view.showGameSpecificOptions(options)
-        );
+        GameTranslations.load(baseUrl, Cookie.getLanguage(), () -> {
+            if (!stopped) view.showGameSpecificOptions(options);
+        });
     }
 
     @Override
     public void stop() {
+        stopped = true;
         if (confirmReg != null) { confirmReg.removeHandler(); confirmReg = null; }
         if (cancelReg  != null) { cancelReg.removeHandler();  cancelReg  = null; }
     }

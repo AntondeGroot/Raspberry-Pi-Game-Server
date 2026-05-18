@@ -29,14 +29,25 @@ public class GameTranslations {
                         } catch (Exception e) {
                             GWT.log("Error parsing translation JSON: " + e.getMessage());
                         }
+                        onComplete.run();
                     } else {
                         GWT.log("Failed to load translations: HTTP " + res.getStatusCode() + " " + res.getStatusText());
+                        if (lang != Language.en) {
+                            GWT.log("Falling back to English game translations");
+                            load(baseUrl, Language.en, onComplete);
+                        } else {
+                            onComplete.run();
+                        }
                     }
-                    onComplete.run();
                 }
                 public void onError(Request req, Throwable t) {
                     GWT.log("Error loading translations: " + t.getMessage());
-                    onComplete.run();
+                    if (lang != Language.en) {
+                        GWT.log("Falling back to English game translations");
+                        load(baseUrl, Language.en, onComplete);
+                    } else {
+                        onComplete.run();
+                    }
                 }
             });
         } catch (RequestException e) {

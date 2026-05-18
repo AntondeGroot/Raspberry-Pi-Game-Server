@@ -6,7 +6,7 @@
   <inherits name="com.google.gwt.json.JSON"/>
   <inherits name="com.google.gwt.i18n.I18N"/>
 
-  <extend-property name="locale" values="en,nl,nb,de,fr"/>
+  <extend-property name="locale" values="en,nl,nb,de,fr,it"/>
   <set-property-fallback name="locale" value="en"/>
 
   <source path="" />
