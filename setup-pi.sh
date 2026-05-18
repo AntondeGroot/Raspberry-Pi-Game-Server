@@ -11,10 +11,10 @@ USE_NAMED_TUNNEL=false
 if [ -s "$CONFIG_FILE" ]; then
   source "$CONFIG_FILE"
 
-  if [ -n "$DOMAIN" ] && [ -n "$TUNNEL_ID" ] && [ -n "$CREDENTIALS_FILE" ]; then
+  if [ -n "$DOMAINS" ] && [ -n "$TUNNEL_ID" ] && [ -n "$CREDENTIALS_FILE" ]; then
     USE_NAMED_TUNNEL=true
   else
-    echo "⚠️  $CONFIG_FILE exists but is missing DOMAIN, TUNNEL_ID, or CREDENTIALS_FILE."
+    echo "⚠️  $CONFIG_FILE exists but is missing DOMAINS, TUNNEL_ID, or CREDENTIALS_FILE."
     echo "   Falling back to random trycloudflare tunnel."
   fi
 else
@@ -58,18 +58,24 @@ $SSH "if ! command -v cloudflared &>/dev/null; then
 fi"
 
 if [ "$USE_NAMED_TUNNEL" = true ]; then
-  echo "⚙️  Installing cloudflared named tunnel config for $DOMAIN..."
+  echo "⚙️  Installing cloudflared named tunnel config for $DOMAINS..."
 
   TMP_CLOUDFLARED_CONFIG="$(mktemp)"
+
+  INGRESS_BLOCK=""
+  for d in $DOMAINS; do
+    INGRESS_BLOCK+="  - hostname: $d
+    service: http://localhost:80
+"
+  done
+  INGRESS_BLOCK+="  - service: http_status:404"
 
   cat > "$TMP_CLOUDFLARED_CONFIG" <<EOF
 tunnel: $TUNNEL_ID
 credentials-file: $CREDENTIALS_FILE
 
 ingress:
-  - hostname: $DOMAIN
-    service: http://localhost:80
-  - service: http_status:404
+$INGRESS_BLOCK
 EOF
 
   $SSH "sudo mkdir -p /etc/cloudflared"
@@ -126,7 +132,9 @@ echo "✅ Pi setup complete."
 echo "   Run ./deploy.sh to deploy the application."
 
 if [ "$USE_NAMED_TUNNEL" = true ]; then
-  echo "   Public URL: https://$DOMAIN"
+  for d in $DOMAINS; do
+    echo "   Public URL: https://$d"
+  done
 else
   echo "   To find your public tunnel URL, run: ./get-tunnel-url.sh"
 fi
