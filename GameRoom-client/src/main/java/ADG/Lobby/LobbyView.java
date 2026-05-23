@@ -1,6 +1,7 @@
 package ADG.Lobby;
 
 import ADG.Utils.Cookie;
+import ADG.Utils.LanguageSelectorWidget;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
@@ -19,6 +20,7 @@ public class LobbyView extends Composite {
     private final static GameLobbyViewUiBinder uiBinder = GWT.create(GameLobbyViewUiBinder.class);
 
     @UiField VerticalPanel mainPanel;
+    @UiField FlowPanel langSelectorRow;
     @UiField FlowPanel createRoomPanel;
     @UiField HTML lobbyTitle;
     @UiField HTML createRoomTitle;
@@ -47,6 +49,7 @@ public class LobbyView extends Composite {
 
     public LobbyView() {
         initWidget(uiBinder.createAndBindUi(this));
+        langSelectorRow.add(new LanguageSelectorWidget());
         lobbyTitle.setHTML("<h1>" + I18n.c().gameLobby() + "</h1>");
         createRoomTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().createARoom() + "</h2>");
         roomNameLabel.setText(I18n.c().roomName());

@@ -1,6 +1,7 @@
 package ADG.Lobby;
 
 import ADG.Utils.GameTranslations;
+import ADG.Utils.LanguageSelectorWidget;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.uibinder.client.UiBinder;
@@ -23,6 +24,7 @@ public class GameOptionsView extends Composite {
     private static Binder uiBinder = GWT.create(Binder.class);
 
     @UiField HTML      pageTitle;
+    @UiField FlowPanel langSelectorRow;
     @UiField HTML      roomSettingsTitle;
     @UiField HTML      gameSettingsTitle;
     @UiField FlowPanel gameSpecificOptionsPanel;
@@ -41,6 +43,7 @@ public class GameOptionsView extends Composite {
 
     public GameOptionsView() {
         initWidget(uiBinder.createAndBindUi(this));
+        langSelectorRow.add(new LanguageSelectorWidget());
         pageTitle.setHTML("<h1>" + I18n.c().gameOptions() + "</h1>");
         roomSettingsTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().roomSettings() + "</h2>");
         gameSettingsTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().gameSettings() + "</h2>");

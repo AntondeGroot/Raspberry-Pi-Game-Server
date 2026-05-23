@@ -365,8 +365,12 @@ td, th, span, p, div, label {
    ============================================= */
 /* Confirm / primary action — orange */
 .confirmButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
   border-radius: var(--radius-md);
-  padding: 6px 18px;
+  padding: 0 18px;
   font-family: 'Nunito', inherit;
   font-size: var(--font-size-base);
   font-weight: 700;
@@ -376,6 +380,7 @@ td, th, span, p, div, label {
   color: #431407;
   box-shadow: 2px 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
   transition: all var(--transition);
+  box-sizing: border-box;
 }
 
 .confirmButton:hover:not(:disabled):not(.confirmButton-disabled) {
@@ -403,8 +408,12 @@ td, th, span, p, div, label {
 
 /* Cancel / secondary action — purple */
 .cancelButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
   border-radius: var(--radius-md);
-  padding: 6px 18px;
+  padding: 0 18px;
   font-family: 'Nunito', inherit;
   font-size: var(--font-size-base);
   font-weight: 700;
@@ -414,6 +423,7 @@ td, th, span, p, div, label {
   color: #1e0a40;
   box-shadow: 2px 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
   transition: all var(--transition);
+  box-sizing: border-box;
 }
 
 .cancelButton:hover {
@@ -429,8 +439,12 @@ td, th, span, p, div, label {
 
 /* Delete — red/danger */
 .deleteButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
   border-radius: var(--radius-md);
-  padding: 6px 18px;
+  padding: 0 18px;
   font-family: 'Nunito', inherit;
   font-size: var(--font-size-base);
   font-weight: 700;
@@ -440,6 +454,7 @@ td, th, span, p, div, label {
   color: #450a0a;
   box-shadow: 2px 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.2);
   transition: all var(--transition);
+  box-sizing: border-box;
 }
 
 .deleteButton:hover {
@@ -550,10 +565,12 @@ td, th, span, p, div, label {
 .sendButton {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  height: 40px;
   font-family: 'Nunito', inherit;
   font-size: var(--font-size-base);
   font-weight: 600;
-  padding: 8px 16px;
+  padding: 0 16px;
   background: linear-gradient(145deg, #fdba74, #f97316);
   border: 2px solid #ea580c;
   border-radius: var(--radius-md);
@@ -561,6 +578,7 @@ td, th, span, p, div, label {
   cursor: pointer;
   box-shadow: 2px 3px 10px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.25);
   transition: all var(--transition);
+  box-sizing: border-box;
 }
 
 .sendButton:hover {
@@ -612,7 +630,7 @@ td, th, span, p, div, label {
   padding: 10px;
   margin: 8px 0;
   width: 660px;
-  height: 140px;
+  height: 250px;
   resize: none;
   box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
   box-sizing: border-box;
@@ -642,13 +660,13 @@ td, th, span, p, div, label {
   font-size: var(--font-size-base);
   font-family: 'Nunito', inherit;
   color: var(--color-text-primary);
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: 8px 10px;
   margin-right: 8px;
   margin-bottom: 10px;
   width: 590px;
-  height: auto;
+  height: 40px;
   resize: none;
   background-color: var(--color-bg-input);
   transition: border-color var(--transition), box-shadow var(--transition);
@@ -756,7 +774,7 @@ td, th, span, p, div, label {
   border: 0;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), rgba(251, 146, 60, 0.5), transparent);
-  margin: 12px 0;
+  margin: 6px 0 0 0;
   width: 100%;
 }
 
@@ -914,11 +932,11 @@ td, th, span, p, div, label {
 /* =============================================
    Language Selector
    ============================================= */
-#lang-selector-root {
-  position: fixed;
-  top: 30px;
-  right: 25px;
-  z-index: 1000;
+
+.room-lang-row {
+  display: flex;
+  justify-content: right;
+  padding: 4px 0 8px;
 }
 
 .lang-selector-container {
@@ -1001,13 +1019,21 @@ td, th, span, p, div, label {
 
   body { padding: 4px; }
 
-  /* ── Lobby title ── */
+  /* ── Lobby/room title shared ── */
   h1 {
-    font-size: clamp(1.4rem, 9vw, 2.5rem);
+    font-size: clamp(1.4rem, 9vw, 2.5rem); /* fallback for lobby title */
     letter-spacing: 0.05em;
-    margin: 10px 0;
+    margin: 0 0 10px 0;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
+
+  /* ── Room title: font scales with name length ── */
+  h1.room-title-short  { font-size: clamp(1.8rem, 9vw,   2.5rem); letter-spacing: 0.05em; }
+  h1.room-title-medium { font-size: clamp(1.2rem, 6vw,   2rem);   letter-spacing: 0.03em; }
+  h1.room-title-long   { font-size: clamp(0.9rem, 4.5vw, 1.6rem); letter-spacing: 0; }
 
   /* ── Section labels ── */
   .section-title {
@@ -1021,13 +1047,6 @@ td, th, span, p, div, label {
      position:absolute fixes it at a spot in page coordinates so it doesn't
      move as content loads; unlike position:fixed it disappears when the user
      scrolls far enough down.                                                  */
-  #lang-selector-root {
-    position: absolute;
-    top: 100px;
-    right: 12px;
-    left: auto;
-    transform: none;
-  }
 
 
   .lang-listbox {
@@ -1173,7 +1192,6 @@ td, th, span, p, div, label {
   .steps-container {
     width: 100%;
     box-sizing: border-box;
-    padding-top: 40px;
   }
 
   /* Allow step label + input to wrap; 16px font stops iOS auto-zoom on focus */
@@ -1254,12 +1272,58 @@ td, th, span, p, div, label {
 
   /* ── Room View ───────────────────────────────────────────────────────────── */
 
-  /* Shorter player simulation so chat fits below without scrolling */
-  .playerSimulation {
-    height: 220px;
+  /* Flex-column layout: simulation grows to fill space, chat stays at bottom */
+  table.roomMainPanel {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 8px);
+    min-height: unset;
   }
 
-  /* Undo absolute bottom-pinning — stack chat naturally below simulation */
+  table.roomMainPanel > tbody {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  table.roomMainPanel > tbody > tr {
+    display: flex;
+    flex-direction: column;
+    flex: 0 0 auto;
+    width: 100%;
+  }
+
+  table.roomMainPanel > tbody > tr > td {
+    width: 100%;
+  }
+
+  /* Simulation row grows to fill all space between lang-selector and chat */
+  table.roomMainPanel > tbody > tr:nth-child(3) {
+    flex: 1;
+    min-height: 0;
+  }
+
+  table.roomMainPanel > tbody > tr:nth-child(3) > td {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* Simulation div and SVG fill the available height */
+  .playerSimulation {
+    flex: 1;
+    height: 100%;
+    min-height: 150px;
+  }
+
+  .playerSimulation svg {
+    height: 100%;
+  }
+
+  /* Undo absolute bottom-pinning — chat flows at the bottom of the flex column */
   .bottom-aligned {
     position: static;
     transform: none;
@@ -1282,24 +1346,44 @@ td, th, span, p, div, label {
     flex: 0 0 auto;
   }
 
-  /* Full-width chat display; slightly shorter to fit mobile viewport */
-  .MessageDisplayField {
-    width: 100% !important;
-    height: 120px;
+  /* Ensure the full-height and bottom-aligned tables fill container width.
+     Only set width — do NOT change display so table layout still works. */
+  table.full-height,
+  table.bottom-aligned {
+    width: 100%;
   }
 
-  /* Stretch the input+button table to full width, input takes remaining space */
-  .bottom-aligned .gwt-HorizontalPanel {
+  table.full-height > tbody > tr > td,
+  table.bottom-aligned > tbody > tr > td {
     width: 100%;
   }
-  .bottom-aligned .gwt-HorizontalPanel > tbody > tr > td:first-child {
+
+  /* The input+button row contains a single <td> which itself wraps an anonymous
+     GWT HorizontalPanel rendered as a plain <table> with no class.
+     Target that inner table directly: make it full-width and give the
+     input td all remaining space so the send button sits at the right edge. */
+  table.bottom-aligned > tbody > tr:last-child > td > table {
     width: 100%;
+  }
+
+  table.bottom-aligned > tbody > tr:last-child > td > table > tbody > tr > td:first-child {
+    width: 100%;
+  }
+
+  /* Full-width chat display at 150px height */
+  .MessageDisplayField {
+    width: 100% !important;
+    height: 100px !important;
+    margin: 8px 0;
+    box-sizing: border-box;
   }
 
   /* Full-width message input; 16px prevents iOS auto-zoom on focus */
   .MessageInputField {
     width: 100% !important;
     font-size: 16px;
-    margin-right: 6px;
+    margin-right: 0;
+    padding-right: 8px;
+    box-sizing: border-box;
   }
 }

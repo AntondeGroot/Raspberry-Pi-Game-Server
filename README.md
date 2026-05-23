@@ -40,6 +40,14 @@ This project was written in GWT in order to get a better understanding of it, si
 
 Run `./deploy.sh` to build, upload, and restart the service.
 
+`deploy.sh` auto-detects the target: it first probes `my-pi` (local network); if unreachable it falls back to `my-pi-ext` (Cloudflare Tunnel). You can also force a target explicitly:
+
+```bash
+./deploy.sh           # auto-detect
+./deploy.sh my-pi     # force local
+./deploy.sh my-pi-ext # force tunnel
+```
+
 ### First-time Pi setup
 
 Run the setup script:
@@ -69,13 +77,37 @@ The script reads `deploy.local.conf` from the project root to decide which tunne
 
 2. Create `deploy.local.conf` in the project root (it is gitignored):
    ```
-   DOMAIN=gameroom.yourdomain.com
-   TUNNEL_NAME=gameroom
+   DOMAINS="gameroom.yourdomain.com"
    TUNNEL_ID=your-tunnel-uuid
    CREDENTIALS_FILE=/home/ubuntu/.cloudflared/your-tunnel-uuid.json
+
+   # Optional: expose SSH over the same tunnel so you can deploy from any network
+   SSH_DOMAIN=ssh.yourdomain.com
    ```
 
 3. Run `./setup-pi.sh`
+
+### Deploying from outside your local network (SSH over Cloudflare Tunnel)
+
+If `SSH_DOMAIN` is set in `deploy.local.conf`, `setup-pi.sh` adds an SSH ingress rule to the tunnel. To use it from any network:
+
+1. Add a CNAME DNS record in Cloudflare: `ssh.yourdomain.com` → `<your-tunnel-id>.cfargotunnel.com`
+
+2. Install cloudflared on your Mac (if not already):
+   ```bash
+   brew install cloudflared
+   ```
+
+3. Add a second host alias in `~/.ssh/config`:
+   ```
+   Host my-pi-ext
+       HostName ssh.yourdomain.com
+       User ubuntu
+       IdentityFile ~/.ssh/pi_deploy_key
+       ProxyCommand cloudflared access ssh --hostname %h
+   ```
+
+After this, `deploy.sh` will automatically fall back to `my-pi-ext` when `my-pi` is unreachable.
 
 **Keezenspel config** — create `/opt/keezen/application-override.yaml` on the Pi (done by Keezenspel's `setup-pi.sh`):
 

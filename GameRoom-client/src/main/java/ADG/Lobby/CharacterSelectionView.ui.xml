@@ -4,6 +4,7 @@
         <g:HTML ui:field="pageTitle">
             <h1>Character Selection</h1>
         </g:HTML>
+        <g:FlowPanel ui:field="langSelectorRow" styleName="room-lang-row"/>
         <g:FlowPanel styleName="steps-container">
             <g:FlowPanel styleName="step-header">
                 <g:HTML><span class="step-badge">1</span></g:HTML>

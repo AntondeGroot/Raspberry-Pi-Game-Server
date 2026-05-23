@@ -6,6 +6,7 @@
             <g:HTML ui:field="lobbyTitle">
                 <h1>Game Lobby</h1>
             </g:HTML>
+            <g:FlowPanel ui:field="langSelectorRow" styleName="room-lang-row"/>
             <g:FlowPanel ui:field="createRoomPanel" styleName="create-room-card">
                 <g:HTML ui:field="createRoomTitle"><h2 class="section-title">Create a Room</h2></g:HTML>
                 <g:FlowPanel styleName="create-room-fields">

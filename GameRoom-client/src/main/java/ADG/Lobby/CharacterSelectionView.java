@@ -1,5 +1,6 @@
 package ADG.Lobby;
 
+import ADG.Utils.LanguageSelectorWidget;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.uibinder.client.UiBinder;
@@ -14,6 +15,7 @@ public class CharacterSelectionView extends Composite {
 
     @UiField VerticalPanel mainPanel;
     @UiField HTML pageTitle;
+    @UiField FlowPanel langSelectorRow;
     @UiField HTML enterUsernameLabel;
     @UiField HTML selectProfileLabel;
     @UiField TextBox usernameInput;
@@ -24,6 +26,7 @@ public class CharacterSelectionView extends Composite {
 
     public CharacterSelectionView() {
         initWidget(uiBinder.createAndBindUi(this));
+        langSelectorRow.add(new LanguageSelectorWidget());
         usernameInput.setMaxLength(10);
         pageTitle.setHTML("<h1>" + I18n.c().characterSelection() + "</h1>");
         enterUsernameLabel.setHTML("<span class=\"step-label\">" + I18n.c().enterUsername() + "</span>");

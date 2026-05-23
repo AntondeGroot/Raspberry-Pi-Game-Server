@@ -1,6 +1,17 @@
 #!/bin/bash
 set -e
 
+if [ -n "$1" ]; then
+  TARGET="$1"
+elif timeout 5 ssh -i ~/.ssh/pi_deploy_key -o ConnectTimeout=4 -o BatchMode=yes -o ConnectionAttempts=1 my-pi true 2>/dev/null; then
+  TARGET=my-pi
+else
+  echo "⚠️  my-pi unreachable, falling back to my-pi-ext (Cloudflare Tunnel)..."
+  TARGET=my-pi-ext
+fi
+SSH="ssh -i ~/.ssh/pi_deploy_key $TARGET"
+SCP="scp -i ~/.ssh/pi_deploy_key"
+
 stamp_css_version_for_cloudflare_cache_invalidation() {
   local v=$(date +%s)
   html_files=(
@@ -26,14 +37,14 @@ echo "🔨 Building..."
 mvn clean package
 
 echo "📦 Uploading..."
-scp -i ~/.ssh/pi_deploy_key GameRoom-server/target/GameRoom.jar my-pi:/home/ubuntu/gameroom.jar
-scp -i ~/.ssh/pi_deploy_key GameRoom-server/src/main/resources/room-names.txt my-pi:/home/ubuntu/room-names.txt
+$SCP GameRoom-server/target/GameRoom.jar $TARGET:/home/ubuntu/gameroom.jar
+$SCP GameRoom-server/src/main/resources/room-names.txt $TARGET:/home/ubuntu/room-names.txt
 
 echo "📁 Installing..."
-ssh -i ~/.ssh/pi_deploy_key my-pi "sudo mkdir -p /opt/gameroom && sudo mv /home/ubuntu/gameroom.jar /opt/gameroom/gameroom.jar && sudo cp /home/ubuntu/room-names.txt /opt/gameroom/room-names.txt && rm -f /home/ubuntu/room-names.txt"
+$SSH "sudo mkdir -p /opt/gameroom && sudo mv /home/ubuntu/gameroom.jar /opt/gameroom/gameroom.jar && sudo cp /home/ubuntu/room-names.txt /opt/gameroom/room-names.txt && rm -f /home/ubuntu/room-names.txt"
 
 echo "⚙️ Ensuring systemd service exists..."
-ssh -i ~/.ssh/pi_deploy_key my-pi "
+$SSH "
 if [ ! -f /etc/systemd/system/gameroom.service ]; then
   sudo tee /etc/systemd/system/gameroom.service > /dev/null << 'EOF'
 [Unit]
@@ -53,10 +64,10 @@ EOF
 fi"
 
 echo "🔄 Restarting..."
-ssh -i ~/.ssh/pi_deploy_key my-pi "sudo systemctl restart gameroom"
+$SSH "sudo systemctl restart gameroom"
 
 echo "⏳ Waiting for server to come up..."
-ssh -i ~/.ssh/pi_deploy_key my-pi "
+$SSH "
   for i in \$(seq 1 60); do
     sleep 2
     if curl -sf http://localhost:4100/ > /dev/null 2>&1; then

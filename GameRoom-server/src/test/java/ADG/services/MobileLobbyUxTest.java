@@ -146,10 +146,11 @@ class MobileLobbyUxTest {
 
         WebElement title = new WebDriverWait(driver, Duration.ofSeconds(10))
                 .until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector("h1")));
-        WebElement langRoot = driver.findElement(By.id("lang-selector-root"));
+        WebElement langRow = new WebDriverWait(driver, Duration.ofSeconds(5))
+                .until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".room-lang-row")));
 
         Rectangle titleRect = title.getRect();
-        Rectangle langRect  = langRoot.getRect();
+        Rectangle langRect  = langRow.getRect();
 
         int titleBottom  = titleRect.getY() + titleRect.getHeight();
         int selectorTop  = langRect.getY();
@@ -166,11 +167,11 @@ class MobileLobbyUxTest {
     void languageSelectorIsFullyWithinViewport() {
         openLobby();
 
-        WebElement langRoot = new WebDriverWait(driver, Duration.ofSeconds(5))
-                .until(ExpectedConditions.visibilityOfElementLocated(By.id("lang-selector-root")));
+        WebElement langRow = new WebDriverWait(driver, Duration.ofSeconds(5))
+                .until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".room-lang-row")));
 
         long viewportWidth = (Long) js.executeScript("return window.innerWidth;");
-        Rectangle rect = langRoot.getRect();
+        Rectangle rect = langRow.getRect();
 
         assertThat(rect.getX())
                 .as("Language selector left edge must not be off-screen")

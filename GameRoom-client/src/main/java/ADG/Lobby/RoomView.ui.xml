@@ -6,6 +6,7 @@
         <g:HTMLPanel width="100%">
             <h1 ui:field="roomTitle"/>
         </g:HTMLPanel>
+        <g:HTMLPanel ui:field="langSelectorRow" styleName="room-lang-row"/>
         <g:HTMLPanel ui:field="playerPanel" styleName="playerSimulation"></g:HTMLPanel>
         <g:VerticalPanel ui:field="roomPanel" styleName="full-height">
             <g:VerticalPanel styleName="bottom-aligned">

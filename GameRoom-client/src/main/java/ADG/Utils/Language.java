@@ -5,7 +5,8 @@ public enum Language {
     en("English"),
     fr("Français"),
     nl("Nederlands"),
-    nb("Norsk");
+    nb("Norsk"),
+    it("Italiano");
 
     private final String displayName;
 

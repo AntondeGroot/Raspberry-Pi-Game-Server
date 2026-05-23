@@ -5,7 +5,6 @@ import ADG.Lobby.RoomServiceAsync;
 import ADG.Lobby.Room;
 import ADG.Lobby.SpriteSheets;
 import ADG.Utils.Cookie;
-import ADG.Utils.LanguageSelectorWidget;
 import com.google.gwt.core.client.EntryPoint;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.core.client.GWT;
@@ -39,7 +38,6 @@ public class App implements EntryPoint {
 		if (Cookie.syncGwtLocale()) {
 			return;
 		}
-		RootPanel.get("lang-selector-root").add(new LanguageSelectorWidget());
 		fetchSpriteSheetsConfig();
 	}
 

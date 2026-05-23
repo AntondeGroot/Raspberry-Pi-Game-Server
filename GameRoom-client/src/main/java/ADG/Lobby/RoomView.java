@@ -1,6 +1,7 @@
 package ADG.Lobby;
 
 import ADG.Utils.Cookie;
+import ADG.Utils.LanguageSelectorWidget;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.dom.client.Element;
@@ -35,6 +36,9 @@ public class RoomView extends Composite {
     Button startGameButton;
 
     @UiField
+    HTMLPanel langSelectorRow;
+
+    @UiField
     HTMLPanel playerPanel;
 
     @UiField
@@ -55,6 +59,7 @@ public class RoomView extends Composite {
         leaveRoomButton.setText(I18n.c().leaveRoom());
         deleteRoomButton.setText(I18n.c().deleteRoom());
         sendMessageButton.setText(I18n.c().send());
+        langSelectorRow.add(new LanguageSelectorWidget());
     }
 
     public Button getLeaveRoomButton() { return leaveRoomButton; }
@@ -117,12 +122,12 @@ public class RoomView extends Composite {
         if (players.length === 0) return;
 
         var width  = container.offsetWidth || 600;
-        var height = 400;
+        var height = container.offsetHeight > 100 ? container.offsetHeight : 400;
         var R      = 36;
         var displaySize = R * 2;
 
         var svg = d3.select(container).append('svg')
-            .attr('width', '100%').attr('height', height);
+            .attr('width', '100%').attr('height', '100%');
 
         var defs = svg.append('defs');
 
@@ -374,6 +379,15 @@ public class RoomView extends Composite {
     }-*/;
 
     public void showRoomName(String roomName) {
-        roomTitle.setInnerText(I18n.c().roomPrefix() + " " + roomName);
+        String fullTitle = I18n.c().roomPrefix() + " " + roomName;
+        roomTitle.setInnerText(fullTitle);
+        int len = fullTitle.length();
+        if (len <= 12) {
+            roomTitle.setClassName("room-title-short");
+        } else if (len <= 22) {
+            roomTitle.setClassName("room-title-medium");
+        } else {
+            roomTitle.setClassName("room-title-long");
+        }
     }
 }
