@@ -40,4 +40,25 @@ public class AdminController {
         lobbySseRegistry.emit(visible);
         return ResponseEntity.noContent().build();
     }
+
+    /** Removes a single player from a room. Requires ADMIN role. */
+    @DeleteMapping("/rooms/{roomId}/players/{playerId}")
+    public ResponseEntity<Void> removePlayer(
+            @PathVariable("roomId") String roomId,
+            @PathVariable("playerId") String playerId) {
+        Room room = roomStore.rooms.stream()
+                .filter(r -> r.getId().equals(roomId))
+                .findFirst()
+                .orElse(null);
+        if (room == null) return ResponseEntity.notFound().build();
+        synchronized (room) {
+            room.removePlayer(playerId);
+        }
+        sseRegistry.emit(roomId, room);
+        List<Room> visible = roomStore.rooms.stream()
+                .filter(r -> r.getStatus() != GameStatus.PENDING)
+                .collect(Collectors.toList());
+        lobbySseRegistry.emit(visible);
+        return ResponseEntity.noContent().build();
+    }
 }

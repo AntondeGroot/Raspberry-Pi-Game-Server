@@ -24,10 +24,12 @@ public class LobbyPresenter implements Presenter {
     private final EventSourceWrapper lobbySse = new EventSourceWrapper();
     private ArrayList<GameOption> cachedGameOptions = null;
     private String selectedGameId = null;
+    private String pendingRejoinRoomId = null;
 
     @Override
     public void start() {
         History.newItem("");
+        pendingRejoinRoomId = Window.Location.getParameter("rejoin");
         checkAdminStatus();
         loadAvailableGames();
         lobbySse.open("/lobby/stream", this::handleLobbySseMessage);
@@ -50,6 +52,7 @@ public class LobbyPresenter implements Presenter {
         view.getCreateRoomTitle().addClickHandler(event -> view.toggleCreateRoom());
         view.addGameSelectionChangeHandler(e -> onGameSelectionChanged());
         view.setDeleteHandler(this::deleteRoomAsAdmin);
+        view.setRemovePlayerHandler(this::removePlayerAsAdmin);
         view.getCreateRoomButton().addClickHandler(event -> {
             String roomName = view.getRoomNameInput().getText().trim();
             if (roomName.isEmpty()) {
@@ -107,8 +110,26 @@ public class LobbyPresenter implements Presenter {
                 updateRooms(fetchedRooms);
                 updateRoomTable();
             }
+            if (pendingRejoinRoomId != null) {
+                attemptAutoRejoin();
+            }
         } catch (Exception e) {
             GWT.log("Lobby SSE parse error: " + e.getMessage());
+        }
+    }
+
+    private void attemptAutoRejoin() {
+        final String roomId = pendingRejoinRoomId;
+        Room room = rooms.stream()
+                .filter(r -> r.getId().equals(roomId))
+                .findFirst()
+                .orElse(null);
+        if (room == null) return;
+        pendingRejoinRoomId = null;
+        if (GameStatus.PLAYING.equals(room.getStatus())) {
+            presenterManager.switchToGameRoom(room);
+        } else {
+            navigateToCharacterSelection(room);
         }
     }
 
@@ -294,6 +315,29 @@ public class LobbyPresenter implements Presenter {
             });
         } catch (RequestException e) {
             GWT.log("Admin check failed: " + e.getMessage());
+        }
+    }
+
+    private void removePlayerAsAdmin(Room room, String playerId, String playerName) {
+        if (!Window.confirm(I18n.m().confirmRemovePlayer(playerName))) return;
+        RequestBuilder rb = new RequestBuilder(RequestBuilder.DELETE,
+                "/admin/rooms/" + room.getId() + "/players/" + playerId);
+        rb.setHeader("Accept", "application/json");
+        try {
+            rb.sendRequest(null, new RequestCallback() {
+                @Override
+                public void onResponseReceived(Request request, Response response) {
+                    if (response.getStatusCode() != Response.SC_NO_CONTENT) {
+                        view.showAlert(I18n.m().errDeleteFailed(response.getStatusText()));
+                    }
+                }
+                @Override
+                public void onError(Request request, Throwable exception) {
+                    view.showAlert(I18n.m().errDeleteFailed(exception.getMessage()));
+                }
+            });
+        } catch (RequestException e) {
+            GWT.log("Remove player failed: " + e.getMessage());
         }
     }
 

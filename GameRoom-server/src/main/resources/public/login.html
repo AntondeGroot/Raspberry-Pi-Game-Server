@@ -144,10 +144,10 @@
     }
 
     document.getElementById('login-form').addEventListener('submit', function (e) {
-      var username = document.getElementById('username').value.trim();
-      var password = document.getElementById('password').value;
       var usernameInput = document.getElementById('username');
       var passwordInput = document.getElementById('password');
+      var username = usernameInput.value.trim();
+      var password = passwordInput.value;
 
       usernameInput.classList.remove('input-error');
       passwordInput.classList.remove('input-error');
@@ -169,7 +169,16 @@
         e.preventDefault();
         passwordInput.classList.add('input-error');
         showError('Password is required.');
+        return;
       }
+
+      // Tell the browser's password manager to offer saving these credentials.
+      // Chrome queues the save prompt and shows it after the navigation succeeds.
+      if (window.PasswordCredential) {
+        usernameInput.value = username; // store trimmed value
+        navigator.credentials.store(new PasswordCredential(this));
+      }
+      // Let the native form POST proceed — preserves Spring Security's session handling.
     });
   </script>
 </body>

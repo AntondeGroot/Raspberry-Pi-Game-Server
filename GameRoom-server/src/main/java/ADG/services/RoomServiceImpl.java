@@ -20,6 +20,8 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
@@ -317,7 +319,12 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         try {
             GameOption[] options = restTemplate.getForObject(game.getBaseUrl() + "/game-options", GameOption[].class);
             if (options == null) return new ArrayList<>();
-            return new ArrayList<>(java.util.Arrays.asList(options));
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            boolean isAdmin = auth != null && auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+            return java.util.Arrays.stream(options)
+                    .filter(o -> !o.isAdminOnly() || isAdmin)
+                    .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
         } catch (RestClientException e) {
             return new ArrayList<>();
         }

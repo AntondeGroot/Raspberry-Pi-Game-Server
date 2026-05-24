@@ -41,8 +41,13 @@ public class LobbyView extends Composite {
         void onDelete(Room room);
     }
 
+    public interface RemovePlayerHandler {
+        void onRemovePlayer(Room room, String playerId, String playerName);
+    }
+
     private JoinHandler joinHandler;
     private DeleteHandler deleteHandler;
+    private RemovePlayerHandler removePlayerHandler;
     private String currentPlayerId;
     private boolean adminMode = false;
     private ArrayList<GameDefinition> gameDefinitions = new ArrayList<>();
@@ -79,6 +84,10 @@ public class LobbyView extends Composite {
 
     public void setDeleteHandler(DeleteHandler handler) {
         this.deleteHandler = handler;
+    }
+
+    public void setRemovePlayerHandler(RemovePlayerHandler handler) {
+        this.removePlayerHandler = handler;
     }
 
     public void setAdminMode(boolean adminMode) {
@@ -142,22 +151,65 @@ public class LobbyView extends Composite {
         FlowPanel row = new FlowPanel();
         row.setStyleName("room-table-row");
 
-        Label nameLabel = new Label(room.getName());
-        nameLabel.setStyleName("room-table-cell room-cell-name");
-        row.add(nameLabel);
+        // Name cell — admin gets a triangle toggle; everyone else gets a plain label
+        if (adminMode) {
+            FlowPanel nameCell = new FlowPanel();
+            nameCell.setStyleName("room-table-cell room-cell-name admin-name-cell");
+            FlowPanel dropdown = buildPlayerDropdown(room);
+            Button triangle = new Button("▶");
+            triangle.setStylePrimaryName("admin-triangle-btn");
+            triangle.addClickHandler(e -> {
+                boolean open = dropdown.isVisible();
+                dropdown.setVisible(!open);
+                triangle.setText(open ? "▶" : "▼");
+            });
+            InlineLabel nameText = new InlineLabel(room.getName());
+            nameText.setStyleName("admin-room-name");
+            nameCell.add(triangle);
+            nameCell.add(nameText);
+            row.add(nameCell);
 
-        Label gameLabel = new Label(getGameName(room.getGameId()));
-        gameLabel.setStyleName("room-table-cell room-cell-game");
-        row.add(gameLabel);
+            Label gameLabel = new Label(getGameName(room.getGameId()));
+            gameLabel.setStyleName("room-table-cell room-cell-game");
+            row.add(gameLabel);
 
-        Label playersLabel = new Label(room.getNrOfPlayers() + " / " + room.getMaxPlayers());
-        playersLabel.setStyleName("room-table-cell room-cell-players");
-        row.add(playersLabel);
+            Label playersLabel = new Label(room.getNrOfPlayers() + " / " + room.getMaxPlayers());
+            playersLabel.setStyleName("room-table-cell room-cell-players");
+            row.add(playersLabel);
 
-        Label statusLabel = new Label(getStatusText(room.getStatus()));
-        statusLabel.setStyleName("room-table-cell room-cell-status " + getStatusClass(room.getStatus()));
-        row.add(statusLabel);
+            Label statusLabel = new Label(getStatusText(room.getStatus()));
+            statusLabel.setStyleName("room-table-cell room-cell-status " + getStatusClass(room.getStatus()));
+            row.add(statusLabel);
 
+            FlowPanel actionCell = buildActionCell(room);
+            row.add(actionCell);
+
+            // Dropdown spans the full row width; placed last so grid auto-places it in row 2
+            row.add(dropdown);
+        } else {
+            Label nameLabel = new Label(room.getName());
+            nameLabel.setStyleName("room-table-cell room-cell-name");
+            row.add(nameLabel);
+
+            Label gameLabel = new Label(getGameName(room.getGameId()));
+            gameLabel.setStyleName("room-table-cell room-cell-game");
+            row.add(gameLabel);
+
+            Label playersLabel = new Label(room.getNrOfPlayers() + " / " + room.getMaxPlayers());
+            playersLabel.setStyleName("room-table-cell room-cell-players");
+            row.add(playersLabel);
+
+            Label statusLabel = new Label(getStatusText(room.getStatus()));
+            statusLabel.setStyleName("room-table-cell room-cell-status " + getStatusClass(room.getStatus()));
+            row.add(statusLabel);
+
+            row.add(buildActionCell(room));
+        }
+
+        return row;
+    }
+
+    private FlowPanel buildActionCell(Room room) {
         FlowPanel actionCell = new FlowPanel();
         actionCell.setStyleName("room-table-cell room-cell-action");
         boolean isMember = currentPlayerId != null && room.getPlayerIds().contains(currentPlayerId);
@@ -178,10 +230,63 @@ public class LobbyView extends Composite {
             deleteBtn.addClickHandler(e -> { if (deleteHandler != null) deleteHandler.onDelete(room); });
             actionCell.add(deleteBtn);
         }
-        row.add(actionCell);
-
-        return row;
+        return actionCell;
     }
+
+    private FlowPanel buildPlayerDropdown(Room room) {
+        FlowPanel dropdown = new FlowPanel();
+        dropdown.setStyleName("admin-player-dropdown");
+        dropdown.setVisible(false);
+
+        if (room.getPlayerIds().isEmpty()) {
+            InlineLabel empty = new InlineLabel("No players in this room.");
+            empty.setStyleName("admin-player-empty");
+            dropdown.add(empty);
+            return dropdown;
+        }
+
+        for (String playerId : room.getPlayerIds()) {
+            String playerName = room.getPlayerNames().get(playerId);
+            if (playerName == null) playerName = playerId;
+            final String fId = playerId;
+            final String fName = playerName;
+
+            FlowPanel playerRow = new FlowPanel();
+            playerRow.setStyleName("admin-player-row");
+
+            InlineLabel nameLabel = new InlineLabel(playerName);
+            nameLabel.setStyleName("admin-player-name");
+
+            Button shareBtn = new Button("↗");
+            shareBtn.setStylePrimaryName("admin-share-btn");
+            shareBtn.setTitle("Copy rejoin link to clipboard");
+            shareBtn.addClickHandler(e -> copyToClipboard("/rejoin?pid=" + fId + "&rid=" + room.getId()));
+
+            Button removeBtn = new Button("✕");
+            removeBtn.setStylePrimaryName("admin-remove-player-btn");
+            removeBtn.addClickHandler(e -> {
+                if (removePlayerHandler != null) removePlayerHandler.onRemovePlayer(room, fId, fName);
+            });
+
+            playerRow.add(nameLabel);
+            playerRow.add(shareBtn);
+            playerRow.add(removeBtn);
+            dropdown.add(playerRow);
+        }
+
+        return dropdown;
+    }
+
+    public static native void copyToClipboard(String url) /*-{
+        var full = $wnd.location.origin + url;
+        if ($wnd.navigator.clipboard) {
+            $wnd.navigator.clipboard.writeText(full)['catch'](function() {
+                $wnd.prompt("Copy this rejoin link:", full);
+            });
+        } else {
+            $wnd.prompt("Copy this rejoin link:", full);
+        }
+    }-*/;
 
     private Label makeHeaderCell(String text, String extraStyle) {
         Label label = new Label(text);

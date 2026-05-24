@@ -2,7 +2,15 @@
 set -euo pipefail
 
 SSH_KEY=~/.ssh/pi_deploy_key
-HOST=my-pi
+
+if [ -n "${1:-}" ]; then
+  HOST="$1"
+elif timeout 5 ssh -i "$SSH_KEY" -o ConnectTimeout=4 -o BatchMode=yes -o ConnectionAttempts=1 my-pi true 2>/dev/null; then
+  HOST=my-pi
+else
+  echo "⚠️  my-pi unreachable, falling back to my-pi-ext (Cloudflare Tunnel)..."
+  HOST=my-pi-ext
+fi
 
 echo "Setting admin password on $HOST..."
 
@@ -38,8 +46,11 @@ sudo chown ubuntu:ubuntu "$SECRETS"
 sudo chmod 600 "$SECRETS"
 
 echo ""
+echo "Admin username: admin"
 echo "Admin password : $PASSWORD"
 echo "Secrets file   : $SECRETS (mode 600, owner ubuntu)"
 echo ""
-echo "Restart to apply: sudo systemctl restart gameroom"
+echo "Restarting gameroom..."
+sudo systemctl restart gameroom
+echo "Done."
 REMOTE

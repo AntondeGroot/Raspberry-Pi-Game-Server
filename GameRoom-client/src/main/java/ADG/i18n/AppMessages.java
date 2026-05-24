@@ -7,6 +7,7 @@ public interface AppMessages extends Messages {
     String willStartTheGame(String name);
     String confirmLeaveRoom(String roomName);
     String confirmDeleteRoomNamed(String roomName);
+    String confirmRemovePlayer(String playerName);
     String errMaxPlayersBetween(int min, int max);
     String errDeleteFailedHttp(int statusCode);
     String errDeleteFailed(String message);

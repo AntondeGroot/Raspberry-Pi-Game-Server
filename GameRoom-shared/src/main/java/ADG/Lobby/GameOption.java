@@ -15,6 +15,7 @@ public class GameOption implements IsSerializable {
     private ArrayList<String> choices;
     private Integer minValue;
     private Integer maxValue;
+    private boolean adminOnly;
 
     public GameOption() {}
 
@@ -47,4 +48,7 @@ public class GameOption implements IsSerializable {
 
     public Integer getMaxValue() { return maxValue; }
     public void setMaxValue(Integer maxValue) { this.maxValue = maxValue; }
+
+    public boolean isAdminOnly() { return adminOnly; }
+    public void setAdminOnly(boolean adminOnly) { this.adminOnly = adminOnly; }
 }
