@@ -16,6 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Random;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,6 +34,13 @@ import org.slf4j.LoggerFactory;
 public class RoomServiceImpl extends RemoteServiceServlet implements RoomService {
 
     private static final Logger logger = LoggerFactory.getLogger(RoomServiceImpl.class);
+
+    // Password generation: CVCVC using letters that are unambiguous when read aloud or written.
+    // Excluded vowels  : I (→1/L), O (→0)
+    // Excluded consonants: B (→8), G (→6/9), L (→1/I), Q (rare/O-like), S (→5), V (→U), Z (→2)
+    private static final char[] PWD_VOWELS     = "AEU".toCharArray();
+    private static final char[] PWD_CONSONANTS = "CDFHJKMNPRTWXY".toCharArray();
+    private static final Random  PWD_RANDOM    = new Random();
 
     @Autowired
     private GamesConfig gamesConfig;
@@ -160,12 +168,21 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         Optional<Room> result = roomStore.rooms.stream().filter(r -> r.getId().equals(room.getId())).findFirst();
         if(result.isPresent()) {
             Room foundRoom = result.get();
-            // Preserve gameBaseUrl if not set on the incoming room
-            if ((room.getGameBaseUrl() == null || room.getGameBaseUrl().isBlank()) && foundRoom.getGameBaseUrl() != null) {
-                room.setGameBaseUrl(foundRoom.getGameBaseUrl());
+            // Update only the client-controlled configuration fields.
+            // Player state (playerIds, playerNames, playerProfiles), status, gameSessionId,
+            // and createdByUserId are authoritative server-side and must never be overwritten
+            // by a stale client copy.
+            foundRoom.setGameId(room.getGameId());
+            foundRoom.setGameOptions(room.getGameOptions());
+            foundRoom.setMaxPlayers(room.getMaxPlayers());
+            foundRoom.setUniqueProfilePics(room.isUniqueProfilePics());
+            foundRoom.setAnyPlayerCanSelectGame(room.isAnyPlayerCanSelectGame());
+            foundRoom.setAnyPlayerCanSetOptions(room.isAnyPlayerCanSetOptions());
+            // Only update gameBaseUrl if the incoming value is richer (set by server via setRoomGame;
+            // client may carry a stale or empty value)
+            if (room.getGameBaseUrl() != null && !room.getGameBaseUrl().isBlank()) {
+                foundRoom.setGameBaseUrl(room.getGameBaseUrl());
             }
-            roomStore.rooms.remove(foundRoom);
-            roomStore.rooms.add(room);
             logger.debug("Room {} updated successfully", room.getId());
         } else {
             logger.error("Room not found with ID: {}", room.getId());
@@ -232,6 +249,10 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         logger.debug("Starting game for room: {}", roomId);
         for (Room room1 : roomStore.rooms) {
             if (room1.getId().equals(roomId)) {
+
+                if (room1.getGameId() == null || room1.getGameId().isEmpty()) {
+                    throw new RoomServiceException("No game selected. Please select a game before starting.");
+                }
 
                 GameDefinition game = gamesConfig.findById(room1.getGameId())
                         .orElseThrow(() -> new RoomServiceException("Unknown game: " + room1.getGameId()));
@@ -328,6 +349,69 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         } catch (RestClientException e) {
             return new ArrayList<>();
         }
+    }
+
+    @Override
+    public synchronized void setRoomGame(String roomId, String gameId) throws RoomServiceException {
+        String callerId = getPlayerIdFromRequest();
+        Room found = roomStore.rooms.stream()
+                .filter(r -> r.getId().equals(roomId))
+                .findFirst()
+                .orElseThrow(() -> new RoomServiceException("Room not found: " + roomId));
+        boolean isCreator = found.getCreatedByUserId().equals(callerId);
+        if (!isCreator && !found.isAnyPlayerCanSelectGame()) {
+            throw new RoomServiceException("Not authorized to select game");
+        }
+        found.setGameId(gameId);
+        found.setGameOptions(new HashMap<>());
+        gamesConfig.findById(gameId).ifPresent(game -> {
+            found.setMinPlayers(game.getMinPlayers());
+            found.setMaxPlayers(game.getMaxPlayers());
+            found.setGameBaseUrl(game.getBaseUrl());
+        });
+        emitRoomUpdate(roomId);
+        emitLobbyUpdate();
+    }
+
+    @Override
+    public synchronized void setRoomPermissions(String roomId, boolean anyPlayerCanSelectGame, boolean anyPlayerCanSetOptions) throws RoomServiceException {
+        String callerId = getPlayerIdFromRequest();
+        Room found = roomStore.rooms.stream()
+                .filter(r -> r.getId().equals(roomId))
+                .findFirst()
+                .orElseThrow(() -> new RoomServiceException("Room not found: " + roomId));
+        if (!found.getCreatedByUserId().equals(callerId)) {
+            throw new RoomServiceException("Only the room creator can change permissions");
+        }
+        found.setAnyPlayerCanSelectGame(anyPlayerCanSelectGame);
+        found.setAnyPlayerCanSetOptions(anyPlayerCanSetOptions);
+        emitRoomUpdate(roomId);
+    }
+
+    @Override
+    public synchronized void setRoomPassword(String roomId, boolean enabled) throws RoomServiceException {
+        String callerId = getPlayerIdFromRequest();
+        Room found = roomStore.rooms.stream()
+                .filter(r -> r.getId().equals(roomId))
+                .findFirst()
+                .orElseThrow(() -> new RoomServiceException("Room not found: " + roomId));
+        if (!found.getCreatedByUserId().equals(callerId)) {
+            throw new RoomServiceException("Only the room creator can set a room password");
+        }
+        found.setRoomPassword(enabled ? generateRoomPassword() : null);
+        emitRoomUpdate(roomId);
+        emitLobbyUpdate();
+    }
+
+    /** Generates a CVCVC password using unambiguous letters. */
+    private String generateRoomPassword() {
+        char[] pwd = new char[5];
+        pwd[0] = PWD_CONSONANTS[PWD_RANDOM.nextInt(PWD_CONSONANTS.length)];
+        pwd[1] = PWD_VOWELS[PWD_RANDOM.nextInt(PWD_VOWELS.length)];
+        pwd[2] = PWD_CONSONANTS[PWD_RANDOM.nextInt(PWD_CONSONANTS.length)];
+        pwd[3] = PWD_VOWELS[PWD_RANDOM.nextInt(PWD_VOWELS.length)];
+        pwd[4] = PWD_CONSONANTS[PWD_RANDOM.nextInt(PWD_CONSONANTS.length)];
+        return new String(pwd);
     }
 
     @Override

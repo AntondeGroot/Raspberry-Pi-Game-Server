@@ -22,8 +22,6 @@ public class LobbyPresenter implements Presenter {
     private final RoomServiceAsync roomService;
     private final ArrayList<Room> rooms = new ArrayList<>();
     private final EventSourceWrapper lobbySse = new EventSourceWrapper();
-    private ArrayList<GameOption> cachedGameOptions = null;
-    private String selectedGameId = null;
     private String pendingRejoinRoomId = null;
 
     @Override
@@ -50,7 +48,6 @@ public class LobbyPresenter implements Presenter {
     private void bind() {
         view.setCurrentPlayerId(Cookie.getPlayerId());
         view.getCreateRoomTitle().addClickHandler(event -> view.toggleCreateRoom());
-        view.addGameSelectionChangeHandler(e -> onGameSelectionChanged());
         view.setDeleteHandler(this::deleteRoomAsAdmin);
         view.setRemovePlayerHandler(this::removePlayerAsAdmin);
         view.getCreateRoomButton().addClickHandler(event -> {
@@ -74,6 +71,14 @@ public class LobbyPresenter implements Presenter {
         view.setJoinHandler(room -> {
             if (GameStatus.PLAYING.equals(room.getStatus())) {
                 presenterManager.switchToGameRoom(room);
+            } else if (room.hasPassword()) {
+                String entered = Window.prompt(I18n.c().enterPasswordPrompt(), "");
+                if (entered == null) return; // cancelled
+                if (!entered.equalsIgnoreCase(room.getRoomPassword())) {
+                    AudioPlayer.errorAlert(I18n.c().wrongPassword());
+                    return;
+                }
+                navigateToCharacterSelection(room);
             } else {
                 navigateToCharacterSelection(room);
             }
@@ -176,6 +181,10 @@ public class LobbyPresenter implements Presenter {
             r.addPlayerName(e.getKey(), e.getValue());
         for (java.util.Map.Entry<String, String> e : parseStringMap(obj.get("playerProfiles")).entrySet())
             r.addPlayerProfile(e.getKey(), e.getValue());
+        JSONValue pwdVal = obj.get("roomPassword");
+        if (pwdVal != null && pwdVal.isString() != null) {
+            r.setRoomPassword(pwdVal.isString().stringValue());
+        }
         return r;
     }
 
@@ -194,25 +203,6 @@ public class LobbyPresenter implements Presenter {
             if (v != null && v.isString() != null) map.put(key, v.isString().stringValue());
         }
         return map;
-    }
-
-    private void onGameSelectionChanged() {
-        String gameId = view.getSelectedGameId();
-        if (gameId == null || gameId.equals(selectedGameId)) return;
-        selectedGameId = gameId;
-        cachedGameOptions = null;
-        roomService.getGameOptions(gameId, new AsyncCallback<ArrayList<GameOption>>() {
-            @Override public void onFailure(Throwable t) {
-                GWT.log("Failed to load game options: " + t.getMessage());
-            }
-            @Override public void onSuccess(ArrayList<GameOption> options) {
-                if (gameId.equals(selectedGameId)) cachedGameOptions = options;
-            }
-        });
-    }
-
-    private void navigateToGameOptions(Room room) {
-        presenterManager.switchToGameOptions(room, cachedGameOptions);
     }
 
     /**
@@ -251,17 +241,11 @@ public class LobbyPresenter implements Presenter {
             @Override
             public void onSuccess(ArrayList<GameDefinition> games) {
                 view.populateGameList(games);
-                onGameSelectionChanged();
             }
         });
     }
 
     private void createRoom(String roomName) {
-        String gameId = view.getSelectedGameId();
-        if (gameId == null) {
-            AudioPlayer.errorAlert(I18n.c().errSelectGame());
-            return;
-        }
         // Fast client-side check against cached list before hitting the server
         boolean nameExists = rooms.stream()
                 .anyMatch(r -> r.getName().equalsIgnoreCase(roomName));
@@ -278,7 +262,6 @@ public class LobbyPresenter implements Presenter {
             if (!confirmed) return;
         }
         Room room = new Room(roomName, playerId);
-        room.setGameId(gameId);
         view.getRoomNameInput().setText("");
         roomService.createRoom(room, new AsyncCallback<Room>() {
             @Override
@@ -287,7 +270,7 @@ public class LobbyPresenter implements Presenter {
             }
             @Override
             public void onSuccess(Room created) {
-                navigateToGameOptions(created);
+                navigateToCharacterSelection(created);
             }
         });
     }

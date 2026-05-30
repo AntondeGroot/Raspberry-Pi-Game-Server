@@ -64,7 +64,7 @@ public class GameOptionsPresenter implements Presenter {
             GWT.log("Using public baseUrl for translations: " + baseUrl);
         }
         GameTranslations.load(baseUrl, Cookie.getLanguage(), () -> {
-            if (!stopped) view.showGameSpecificOptions(options);
+            if (!stopped) view.showGameSpecificOptions(options, room.getGameOptions());
         });
     }
 
@@ -101,18 +101,13 @@ public class GameOptionsPresenter implements Presenter {
                 Window.alert("Failed to save game options: " + errorMsg);
             }
             @Override public void onSuccess(Void v) {
-                GWT.log("Room updated successfully, switching to character selection");
-                presenterManager.switchToCharacterSelection(room);
+                GWT.log("Room updated successfully, switching to room");
+                presenterManager.switchToGameRoom(room);
             }
         });
     }
 
     private void onCancel() {
-        // Room was created as PENDING when the user clicked "Create Room" — clean it up
-        roomService.deleteRoom(room.getId(), new AsyncCallback<Void>() {
-            @Override public void onFailure(Throwable t) {}
-            @Override public void onSuccess(Void v) {}
-        });
-        presenterManager.switchToLobby();
+        presenterManager.switchToGameRoom(room);
     }
 }

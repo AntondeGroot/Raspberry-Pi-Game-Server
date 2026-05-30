@@ -1,8 +1,11 @@
 package ADG.Lobby;
 
 import ADG.Utils.Cookie;
+import ADG.Utils.GameTranslations;
 import ADG.Utils.LanguageSelectorWidget;
 import ADG.i18n.I18n;
+import java.util.ArrayList;
+import java.util.HashMap;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.dom.client.Element;
 import com.google.gwt.dom.client.HeadingElement;
@@ -48,6 +51,33 @@ public class RoomView extends Composite {
     Label startInfoLabel;
 
     @UiField
+    FlowPanel gameConfigPanel;
+
+    @UiField
+    ListBox gameSelectorBox;
+
+    @UiField
+    Button optionsButton;
+
+    @UiField
+    HTML optionsDiffList;
+
+    @UiField
+    FlowPanel permissionsPanel;
+
+    @UiField
+    CheckBox anyPlayerCanSelectGameCheckbox;
+
+    @UiField
+    CheckBox anyPlayerCanSetOptionsCheckbox;
+
+    @UiField
+    CheckBox passwordRequiredCheckbox;
+
+    @UiField
+    Label passwordDisplayLabel;
+
+    @UiField
     TextArea messageDisplayField;
 
     @UiField
@@ -60,6 +90,12 @@ public class RoomView extends Composite {
         deleteRoomButton.setText(I18n.c().deleteRoom());
         sendMessageButton.setText(I18n.c().send());
         langSelectorRow.add(new LanguageSelectorWidget());
+        optionsButton.setText("⚙ " + I18n.c().optionsButtonLabel());
+        optionsButton.setEnabled(false);
+        anyPlayerCanSelectGameCheckbox.setText(I18n.c().anyPlayerCanSelectGame());
+        anyPlayerCanSetOptionsCheckbox.setText(I18n.c().anyPlayerCanSetOptions());
+        passwordRequiredCheckbox.setText(I18n.c().requirePassword());
+        permissionsPanel.setVisible(false);
     }
 
     public Button getLeaveRoomButton() { return leaveRoomButton; }
@@ -69,6 +105,92 @@ public class RoomView extends Composite {
     public TextArea getMessageDisplayField() { return messageDisplayField; }
     public TextBox getMessageInputField() { return messageInputField; }
     public Button getSendMessageButton() { return sendMessageButton; }
+
+    public ListBox getGameSelectorBox() { return gameSelectorBox; }
+    public Button getOptionsButton() { return optionsButton; }
+    public CheckBox getAnyPlayerCanSelectGameCheckbox() { return anyPlayerCanSelectGameCheckbox; }
+    public CheckBox getAnyPlayerCanSetOptionsCheckbox() { return anyPlayerCanSetOptionsCheckbox; }
+    public CheckBox getPasswordRequiredCheckbox() { return passwordRequiredCheckbox; }
+
+    public void updatePasswordDisplay(String password) {
+        if (password != null && !password.isEmpty()) {
+            passwordDisplayLabel.setText("🔑 " + password);
+            passwordDisplayLabel.setVisible(true);
+        } else {
+            passwordDisplayLabel.setVisible(false);
+        }
+    }
+
+    public void populateGameSelector(ArrayList<GameDefinition> games) {
+        gameSelectorBox.clear();
+        gameSelectorBox.addItem(I18n.c().selectGamePlaceholder(), "");
+        for (GameDefinition game : games) {
+            gameSelectorBox.addItem(game.getName(), game.getId());
+        }
+    }
+
+    public void setSelectedGame(String gameId) {
+        if (gameId == null) {
+            gameSelectorBox.setSelectedIndex(0);
+            return;
+        }
+        for (int i = 0; i < gameSelectorBox.getItemCount(); i++) {
+            if (gameId.equals(gameSelectorBox.getValue(i))) {
+                gameSelectorBox.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    public String getSelectedGameId() {
+        int idx = gameSelectorBox.getSelectedIndex();
+        if (idx < 0) return null;
+        String val = gameSelectorBox.getValue(idx);
+        return val.isEmpty() ? null : val;
+    }
+
+    public void setGameSelectorEnabled(boolean enabled) {
+        gameSelectorBox.setEnabled(enabled);
+    }
+
+    public void setOptionsButtonEnabled(boolean enabled) {
+        optionsButton.setEnabled(enabled);
+    }
+
+    public void setPermissionsVisible(boolean visible) {
+        permissionsPanel.setVisible(visible);
+    }
+
+    public void renderOptionsDiff(ArrayList<GameOption> defs, HashMap<String, String> options) {
+        if (defs == null || defs.isEmpty() || options == null || options.isEmpty()) {
+            optionsDiffList.setHTML("");
+            return;
+        }
+        StringBuilder html = new StringBuilder("<ul class=\"options-diff-list\">");
+        boolean any = false;
+        for (GameOption def : defs) {
+            String current = options.get(def.getKey());
+            if (current != null && !current.equals(def.getDefaultValue())) {
+                String label = GameTranslations.translate(def.getLabelKey());
+                if (label == null || label.equals(def.getLabelKey())) {
+                    label = def.getLabel() != null ? def.getLabel() : def.getKey();
+                }
+                String displayValue = current;
+                if ("BOOLEAN".equals(def.getType())) {
+                    displayValue = "true".equalsIgnoreCase(current) ? "✓" : "✗";
+                } else if (def.getChoices() != null && !def.getChoices().isEmpty()) {
+                    String t = GameTranslations.translate("gameOption.choice." + current);
+                    if (t != null && !t.equals("gameOption.choice." + current)) {
+                        displayValue = t;
+                    }
+                }
+                html.append("<li>").append(label).append(": ").append(displayValue).append("</li>");
+                any = true;
+            }
+        }
+        html.append("</ul>");
+        optionsDiffList.setHTML(any ? html.toString() : "");
+    }
 
     public void refreshPlayerList(Map<String, String> userNames, Map<String, String> userProfiles) {
         StringBuilder json = new StringBuilder("[");
@@ -324,13 +446,18 @@ public class RoomView extends Composite {
     public void updateCreatorControls(Room room) {
         boolean isCreator = room.getCreatedByUserId().equals(Cookie.getPlayerId())
                 && room.getStatus() != GameStatus.PLAYING;
+        boolean hasGame = room.getGameId() != null && !room.getGameId().isEmpty();
         boolean enoughPlayers = room.getPlayerNames().size() >= room.getMinPlayers();
 
         startGameButton.setVisible(isCreator);
-        startGameButton.setEnabled(isCreator && enoughPlayers);
+        startGameButton.setEnabled(isCreator && hasGame && enoughPlayers);
 
         if (isCreator) {
-            if (!enoughPlayers) {
+            if (!hasGame) {
+                startInfoLabel.setText(I18n.c().errSelectGame());
+                startInfoLabel.setStyleName("startInfoLabel startInfoLabel-waiting");
+                startInfoLabel.setVisible(true);
+            } else if (!enoughPlayers) {
                 int missing = room.getMinPlayers() - room.getPlayerNames().size();
                 startInfoLabel.setText(I18n.m().waitingForPlayers(missing));
                 startInfoLabel.setStyleName("startInfoLabel startInfoLabel-waiting");

@@ -5,7 +5,6 @@ import ADG.Utils.LanguageSelectorWidget;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.event.dom.client.ChangeHandler;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.Window;
@@ -25,12 +24,10 @@ public class LobbyView extends Composite {
     @UiField HTML lobbyTitle;
     @UiField HTML createRoomTitle;
     @UiField Label roomNameLabel;
-    @UiField Label selectGameLabel;
     @UiField TextBox roomNameInput;
     @UiField Button createRoomButton;
     @UiField Button randomNameButton;
     @UiField Label availableRoomsHeader;
-    @UiField ListBox gameListBox;
     @UiField FlowPanel roomTableContainer;
 
     public interface JoinHandler {
@@ -67,7 +64,6 @@ public class LobbyView extends Composite {
         lobbyTitle.setHTML("<h1>" + I18n.c().gameLobby() + "</h1>");
         createRoomTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().createARoom() + "</h2>");
         roomNameLabel.setText(I18n.c().roomName());
-        selectGameLabel.setText(I18n.c().selectGame());
         createRoomButton.setText(I18n.c().createRoom());
         randomNameButton.setText("🎲 " + I18n.c().randomName());
         availableRoomsHeader.setText(I18n.c().availableRooms());
@@ -113,10 +109,6 @@ public class LobbyView extends Composite {
 
     public void populateGameList(ArrayList<GameDefinition> games) {
         gameDefinitions = games;
-        gameListBox.clear();
-        for (GameDefinition game : games) {
-            gameListBox.addItem(game.getName(), game.getId());
-        }
     }
 
     private String getGameName(String gameId) {
@@ -124,15 +116,6 @@ public class LobbyView extends Composite {
             if (def.getId().equals(gameId)) return def.getName();
         }
         return gameId;
-    }
-
-    public String getSelectedGameId() {
-        int index = gameListBox.getSelectedIndex();
-        return index >= 0 ? gameListBox.getValue(index) : null;
-    }
-
-    public void addGameSelectionChangeHandler(ChangeHandler handler) {
-        gameListBox.addChangeHandler(handler);
     }
 
     public void showAlert(String msg) {
@@ -190,8 +173,8 @@ public class LobbyView extends Composite {
             playersLabel.setStyleName("room-table-cell room-cell-players");
             row.add(playersLabel);
 
-            Label statusLabel = new Label(getStatusText(room.getStatus()));
-            statusLabel.setStyleName("room-table-cell room-cell-status " + getStatusClass(room.getStatus()));
+            Label statusLabel = new Label(getStatusText(room));
+            statusLabel.setStyleName("room-table-cell room-cell-status " + getStatusClass(room));
             row.add(statusLabel);
 
             FlowPanel actionCell = buildActionCell(room);
@@ -212,8 +195,8 @@ public class LobbyView extends Composite {
             playersLabel.setStyleName("room-table-cell room-cell-players");
             row.add(playersLabel);
 
-            Label statusLabel = new Label(getStatusText(room.getStatus()));
-            statusLabel.setStyleName("room-table-cell room-cell-status " + getStatusClass(room.getStatus()));
+            Label statusLabel = new Label(getStatusText(room));
+            statusLabel.setStyleName("room-table-cell room-cell-status " + getStatusClass(room));
             row.add(statusLabel);
 
             row.add(buildActionCell(room));
@@ -307,6 +290,11 @@ public class LobbyView extends Composite {
         return label;
     }
 
+    private String getStatusText(Room room) {
+        String base = getStatusText(room.getStatus());
+        return room.hasPassword() ? "🔑 " + base : base;
+    }
+
     private String getStatusText(GameStatus status) {
         switch (status) {
             case PLAYING: return I18n.c().statusPlaying();
@@ -314,6 +302,10 @@ public class LobbyView extends Composite {
             case FULL:    return I18n.c().statusFull();
             default:      return "";
         }
+    }
+
+    private String getStatusClass(Room room) {
+        return getStatusClass(room.getStatus());
     }
 
     private String getStatusClass(GameStatus status) {

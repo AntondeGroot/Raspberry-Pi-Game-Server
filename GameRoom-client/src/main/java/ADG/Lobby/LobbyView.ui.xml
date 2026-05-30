@@ -15,10 +15,6 @@
                         <g:TextBox ui:field="roomNameInput" styleName="create-room-input" maxLength="25"/>
                         <g:Button ui:field="randomNameButton" stylePrimaryName="randomNameButton"/>
                     </g:FlowPanel>
-                    <g:FlowPanel styleName="create-room-field">
-                        <g:Label ui:field="selectGameLabel" text="Select Game" styleName="create-room-label"/>
-                        <g:ListBox ui:field="gameListBox" styleName="create-room-select"/>
-                    </g:FlowPanel>
                 </g:FlowPanel>
                 <g:FlowPanel styleName="create-room-actions">
                     <g:Button ui:field="createRoomButton" text="Create Room" stylePrimaryName="createRoomButton"/>

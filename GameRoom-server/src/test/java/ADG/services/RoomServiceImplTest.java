@@ -15,6 +15,7 @@ import org.springframework.web.client.RestTemplate;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -827,5 +828,347 @@ class RoomServiceImplTest {
 
         verify(sseRegistry).emitClosed(room.getId());
         verify(lobbySseRegistry).emit(argThat(List::isEmpty));
+    }
+
+    // ── updateRoom (in-place field update) ───────────────────────────────────
+
+    @Test
+    void updateRoomPreservesPlayerIds() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        service.addPlayerIdToRoom("player-1", room.getId());
+
+        // Send an update that carries no player list (as a real client copy would)
+        Room update = new Room();
+        update.setId(room.getId());
+        update.setGameId("qwixx");
+        update.setMaxPlayers(4);
+        service.updateRoom(update);
+
+        Room stored = service.getRoomById(room.getId());
+        assertTrue(stored.getPlayerIds().contains("player-1"),
+                "updateRoom must not wipe existing player IDs");
+    }
+
+    @Test
+    void updateRoomPreservesPlayerNames() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        service.addPlayerIdToRoom("player-1", room.getId());
+        service.setUsernameAndProfile(room, "player-1", "Alice", "0");
+
+        Room update = new Room();
+        update.setId(room.getId());
+        update.setGameId("qwixx");
+        service.updateRoom(update);
+
+        Room stored = service.getRoomById(room.getId());
+        assertEquals("Alice", stored.getPlayerNames().get("player-1"),
+                "updateRoom must not wipe existing player names");
+    }
+
+    @Test
+    void updateRoomPreservesStatus() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        // Add players to trigger FULL status
+        room.setMaxPlayers(1);
+        service.updateRoom(room);
+        service.addPlayerIdToRoom("player-1", room.getId());
+        assertEquals(GameStatus.FULL, service.getRoomById(room.getId()).getStatus());
+
+        // updateRoom must not reset the status
+        Room update = new Room();
+        update.setId(room.getId());
+        update.setMaxPlayers(1);
+        service.updateRoom(update);
+
+        assertEquals(GameStatus.FULL, service.getRoomById(room.getId()).getStatus(),
+                "updateRoom must not reset room status");
+    }
+
+    @Test
+    void updateRoomUpdatesGameOptionsAndGameId() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        HashMap<String, String> opts = new HashMap<>();
+        opts.put("extraRow", "true");
+        Room update = new Room();
+        update.setId(room.getId());
+        update.setGameId("qwixx");
+        update.setGameOptions(opts);
+        service.updateRoom(update);
+
+        Room stored = service.getRoomById(room.getId());
+        assertEquals("qwixx", stored.getGameId());
+        assertEquals("true", stored.getGameOptions().get("extraRow"));
+    }
+
+    // ── setRoomGame ──────────────────────────────────────────────────────────
+
+    @Test
+    void setRoomGameByCreatorSetsGameId() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        service.setRoomGame(room.getId(), "qwixx");
+
+        assertEquals("qwixx", service.getRoomById(room.getId()).getGameId());
+    }
+
+    @Test
+    void setRoomGameWipesExistingOptions() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        // seed options first
+        Room update = new Room();
+        update.setId(room.getId());
+        HashMap<String, String> opts = new HashMap<>();
+        opts.put("extraRow", "true");
+        update.setGameOptions(opts);
+        service.updateRoom(update);
+
+        service.setRoomGame(room.getId(), "qwixx");
+
+        assertTrue(service.getRoomById(room.getId()).getGameOptions().isEmpty(),
+                "game options must be wiped when the game changes");
+    }
+
+    @Test
+    void setRoomGameUpdatesMinMaxFromConfig() throws RoomServiceException {
+        GameDefinition def = new GameDefinition();
+        def.setId("qwixx");
+        def.setMinPlayers(2);
+        def.setMaxPlayers(5);
+        def.setBaseUrl("http://qwixx");
+        when(gamesConfig.findById("qwixx")).thenReturn(Optional.of(def));
+
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        service.setRoomGame(room.getId(), "qwixx");
+
+        Room stored = service.getRoomById(room.getId());
+        assertEquals(2, stored.getMinPlayers());
+        assertEquals(5, stored.getMaxPlayers());
+        assertEquals("http://qwixx", stored.getGameBaseUrl());
+    }
+
+    @Test
+    void setRoomGameByNonCreatorWithPermissionSucceeds() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        room.setAnyPlayerCanSelectGame(true);
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        doReturn("other-player").when(service).getPlayerIdFromRequest();
+
+        assertDoesNotThrow(() -> service.setRoomGame(room.getId(), "qwixx"));
+        assertEquals("qwixx", service.getRoomById(room.getId()).getGameId());
+    }
+
+    @Test
+    void setRoomGameByNonCreatorWithoutPermissionThrows() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        doReturn("other-player").when(service).getPlayerIdFromRequest();
+
+        assertThrows(RoomServiceException.class,
+                () -> service.setRoomGame(room.getId(), "qwixx"),
+                "non-creator without permission must not be able to change the game");
+    }
+
+    @Test
+    void setRoomGameUnknownRoomThrows() {
+        assertThrows(RoomServiceException.class,
+                () -> service.setRoomGame("no-such-room", "qwixx"));
+    }
+
+    @Test
+    void setRoomGameEmitsRoomAndLobbySse() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        reset(lobbySseRegistry, sseRegistry);
+
+        service.setRoomGame(room.getId(), "qwixx");
+
+        verify(sseRegistry).emit(eq(room.getId()), any(Room.class));
+        verify(lobbySseRegistry).emit(any());
+    }
+
+    // ── setRoomPermissions ───────────────────────────────────────────────────
+
+    @Test
+    void setRoomPermissionsByCreatorUpdatesFlags() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        service.setRoomPermissions(room.getId(), true, true);
+
+        Room stored = service.getRoomById(room.getId());
+        assertTrue(stored.isAnyPlayerCanSelectGame());
+        assertTrue(stored.isAnyPlayerCanSetOptions());
+    }
+
+    @Test
+    void setRoomPermissionsCanBeClearedByCreator() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        room.setAnyPlayerCanSelectGame(true);
+        room.setAnyPlayerCanSetOptions(true);
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        service.setRoomPermissions(room.getId(), false, false);
+
+        Room stored = service.getRoomById(room.getId());
+        assertFalse(stored.isAnyPlayerCanSelectGame());
+        assertFalse(stored.isAnyPlayerCanSetOptions());
+    }
+
+    @Test
+    void setRoomPermissionsByNonCreatorThrows() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        doReturn("other-player").when(service).getPlayerIdFromRequest();
+
+        assertThrows(RoomServiceException.class,
+                () -> service.setRoomPermissions(room.getId(), true, false));
+    }
+
+    @Test
+    void setRoomPermissionsUnknownRoomThrows() {
+        assertThrows(RoomServiceException.class,
+                () -> service.setRoomPermissions("no-such-room", true, false));
+    }
+
+    @Test
+    void setRoomPermissionsEmitsRoomSse() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        reset(sseRegistry);
+
+        service.setRoomPermissions(room.getId(), true, false);
+
+        verify(sseRegistry).emit(eq(room.getId()), any(Room.class));
+    }
+
+    // ─── setRoomPassword ─────────────────────────────────────────────────────
+
+    @Test
+    void setRoomPasswordByCreatorGeneratesPassword() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        service.setRoomPassword(room.getId(), true);
+
+        Room stored = service.getRoomById(room.getId());
+        assertTrue(stored.hasPassword(), "room should have a password after enabling");
+        assertNotNull(stored.getRoomPassword());
+        assertEquals(5, stored.getRoomPassword().length(), "password must be 5 characters");
+    }
+
+    @Test
+    void generatedPasswordMatchesCvcvcPattern() throws RoomServiceException {
+        // Run several times to reduce the chance of a false-negative
+        String vowels     = "AEU";
+        String consonants = "CDFHJKMNPRTWXY";
+        for (int i = 0; i < 50; i++) {
+            Room room = buildRoom("Alpha" + i);
+            service.createRoom(room);
+            service.publishRoom(room.getId());
+            service.setRoomPassword(room.getId(), true);
+            String pwd = service.getRoomById(room.getId()).getRoomPassword();
+            assertTrue(consonants.indexOf(pwd.charAt(0)) >= 0, "char 0 must be a consonant: " + pwd);
+            assertTrue(vowels    .indexOf(pwd.charAt(1)) >= 0, "char 1 must be a vowel: "     + pwd);
+            assertTrue(consonants.indexOf(pwd.charAt(2)) >= 0, "char 2 must be a consonant: " + pwd);
+            assertTrue(vowels    .indexOf(pwd.charAt(3)) >= 0, "char 3 must be a vowel: "     + pwd);
+            assertTrue(consonants.indexOf(pwd.charAt(4)) >= 0, "char 4 must be a consonant: " + pwd);
+        }
+    }
+
+    @Test
+    void setRoomPasswordByCreatorClearsPassword() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        service.setRoomPassword(room.getId(), true);
+
+        service.setRoomPassword(room.getId(), false);
+
+        assertFalse(service.getRoomById(room.getId()).hasPassword(),
+                "room should have no password after disabling");
+    }
+
+    @Test
+    void setRoomPasswordByNonCreatorThrows() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        doReturn("other-player").when(service).getPlayerIdFromRequest();
+
+        assertThrows(RoomServiceException.class,
+                () -> service.setRoomPassword(room.getId(), true),
+                "non-creator must not be able to set a room password");
+    }
+
+    @Test
+    void setRoomPasswordUnknownRoomThrows() {
+        assertThrows(RoomServiceException.class,
+                () -> service.setRoomPassword("no-such-room", true));
+    }
+
+    @Test
+    void setRoomPasswordEmitsRoomAndLobbySse() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        reset(sseRegistry);
+        reset(lobbySseRegistry);
+
+        service.setRoomPassword(room.getId(), true);
+
+        verify(sseRegistry).emit(eq(room.getId()), any(Room.class));
+        verify(lobbySseRegistry).emit(any());
+    }
+
+    // ── startGame guard: no game selected ────────────────────────────────────
+
+    @Test
+    void startGameWithNoGameSelectedThrows() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        room.setGameId(null);
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        RoomServiceException ex = assertThrows(RoomServiceException.class,
+                () -> service.startGame(room.getId()));
+        assertTrue(ex.getMessage().contains("No game selected"),
+                "Expected 'No game selected' in message but got: " + ex.getMessage());
+    }
+
+    @Test
+    void startGameWithEmptyGameIdThrows() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        room.setGameId("");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        RoomServiceException ex = assertThrows(RoomServiceException.class,
+                () -> service.startGame(room.getId()));
+        assertTrue(ex.getMessage().contains("No game selected"),
+                "Expected 'No game selected' in message but got: " + ex.getMessage());
     }
 }

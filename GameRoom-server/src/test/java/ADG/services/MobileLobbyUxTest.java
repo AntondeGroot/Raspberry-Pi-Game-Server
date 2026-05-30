@@ -305,12 +305,16 @@ class MobileLobbyUxTest {
         Rectangle nameCellRect  = nameCell.getRect();
         Rectangle statusRect    = statusCell.getRect();
 
-        // Action cell must be in row 2 — top must be at or below the status cell's bottom
+        // Action cell must be in row 2 — its top must be at or below the status cell's bottom.
+        // Both cells live in column 4 so they share the same column track; Chrome derives
+        // their grid-line positions from the same measurement.  ±2 px tolerance handles
+        // integer-rounding of fractional grid-line positions (same rationale as the 1 px
+        // tolerance on the horizontal right-edge check below).
         assertThat(actionRect.getY())
-                .as("Action cell top (y=%d) must be below data cells bottom (y=%d + h=%d = %d)",
-                        actionRect.getY(), nameCellRect.getY(), nameCellRect.getHeight(),
-                        nameCellRect.getY() + nameCellRect.getHeight())
-                .isGreaterThanOrEqualTo(nameCellRect.getY() + nameCellRect.getHeight());
+                .as("Action cell top (y=%d) must be at or below status cell bottom (y=%d + h=%d = %d) [±2 px rounding]",
+                        actionRect.getY(), statusRect.getY(), statusRect.getHeight(),
+                        statusRect.getY() + statusRect.getHeight())
+                .isGreaterThanOrEqualTo(statusRect.getY() + statusRect.getHeight() - 2);
 
         // Action cell right edge must align with the status cell right edge (same grid column)
         assertThat(actionRect.getX() + actionRect.getWidth())

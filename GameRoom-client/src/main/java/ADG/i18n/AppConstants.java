@@ -34,6 +34,13 @@ public interface AppConstants extends Constants {
     String roomPrefix();
     String theHost();
     String hasLeftTheRoom();
+    String selectGamePlaceholder();
+    String optionsButtonLabel();
+    String anyPlayerCanSelectGame();
+    String anyPlayerCanSetOptions();
+    String requirePassword();
+    String enterPasswordPrompt();
+    String wrongPassword();
 
     // Character selection
     String characterSelection();

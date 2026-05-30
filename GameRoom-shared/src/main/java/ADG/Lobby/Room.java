@@ -22,6 +22,9 @@ public class Room implements IsSerializable {
     private int maxPlayers = 8;
     private boolean uniqueProfilePics = true;
     private HashMap<String, String> gameOptions = new HashMap<>();
+    private boolean anyPlayerCanSelectGame = false;
+    private boolean anyPlayerCanSetOptions = false;
+    private String roomPassword = null;
 
     public Room() {} // Default constructor
 
@@ -152,6 +155,16 @@ public class Room implements IsSerializable {
         this.gameOptions = gameOptions;
     }
 
+    public boolean isAnyPlayerCanSelectGame() { return anyPlayerCanSelectGame; }
+    public void setAnyPlayerCanSelectGame(boolean v) { this.anyPlayerCanSelectGame = v; }
+
+    public boolean isAnyPlayerCanSetOptions() { return anyPlayerCanSetOptions; }
+    public void setAnyPlayerCanSetOptions(boolean v) { this.anyPlayerCanSetOptions = v; }
+
+    public String getRoomPassword() { return roomPassword; }
+    public void setRoomPassword(String roomPassword) { this.roomPassword = roomPassword; }
+    public boolean hasPassword() { return roomPassword != null && !roomPassword.isEmpty(); }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -170,13 +183,17 @@ public class Room implements IsSerializable {
                 && Objects.equals(gameId, room.gameId)
                 && Objects.equals(gameSessionId, room.gameSessionId)
                 && Objects.equals(gameBaseUrl, room.gameBaseUrl)
-                && Objects.equals(gameOptions, room.gameOptions);
+                && Objects.equals(gameOptions, room.gameOptions)
+                && anyPlayerCanSelectGame == room.anyPlayerCanSelectGame
+                && anyPlayerCanSetOptions == room.anyPlayerCanSetOptions
+                && Objects.equals(roomPassword, room.roomPassword);
     }
 
     @Override
     public int hashCode() {
         return Objects.hash(id, createdByUserId, name, status, playerIds, playerNames,
-                playerProfiles, gameId, gameSessionId, gameBaseUrl, minPlayers, maxPlayers, uniqueProfilePics, gameOptions);
+                playerProfiles, gameId, gameSessionId, gameBaseUrl, minPlayers, maxPlayers, uniqueProfilePics, gameOptions,
+                anyPlayerCanSelectGame, anyPlayerCanSetOptions, roomPassword);
     }
 
     @Override

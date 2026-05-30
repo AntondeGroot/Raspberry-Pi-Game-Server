@@ -6,6 +6,7 @@ import ADG.i18n.I18n;
 import ADG.Utils.ChatCipher;
 import ADG.Utils.Cookie;
 import ADG.Utils.EventSourceWrapper;
+import ADG.Utils.GameTranslations;
 import ADG.Utils.TimeUtils;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.shared.HandlerRegistration;
@@ -19,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class RoomPresenter implements Presenter {
 
@@ -33,6 +35,12 @@ public class RoomPresenter implements Presenter {
     private HashMap<String, String> userProfiles = new HashMap<>();
     private boolean playerListInitialized = false;
     private boolean isAdmin = false;
+    private String knownGameId = null;
+    private ArrayList<GameOption> gameOptionDefs = new ArrayList<>();
+    private HashMap<String, String> knownGameOptions = new HashMap<>();
+    private boolean knownAnyPlayerCanSelectGame = false;
+    private boolean knownAnyPlayerCanSetOptions = false;
+    private boolean knownPasswordRequired = false;
     private final EventSourceWrapper sseWrapper = new EventSourceWrapper();
     private final EventSourceWrapper chatSseWrapper = new EventSourceWrapper();
     private final List<HandlerRegistration> handlerRegistrations = new ArrayList<>();
@@ -48,6 +56,12 @@ public class RoomPresenter implements Presenter {
     public void start() {
         History.newItem("room=" + room.getId());
         AudioPlayer.play(AudioPlayer.PLAYER_ENTER);
+        knownGameId = room.getGameId();
+        knownGameOptions = room.getGameOptions() != null ? new HashMap<>(room.getGameOptions()) : new HashMap<>();
+        knownAnyPlayerCanSelectGame = room.isAnyPlayerCanSelectGame();
+        knownAnyPlayerCanSetOptions = room.isAnyPlayerCanSetOptions();
+        knownPasswordRequired = room.hasPassword();
+        loadAvailableGamesForRoom();
         checkAdminStatus();
         bind();
         sseWrapper.open(
@@ -80,6 +94,11 @@ public class RoomPresenter implements Presenter {
             }
         }));
         roomView.updateCreatorControls(room);
+        handlerRegistrations.add(roomView.getGameSelectorBox().addChangeHandler(event -> onGameSelectorChanged()));
+        handlerRegistrations.add(roomView.getOptionsButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); onOptionsButtonClicked(); }));
+        handlerRegistrations.add(roomView.getAnyPlayerCanSelectGameCheckbox().addValueChangeHandler(event -> onPermissionChanged()));
+        handlerRegistrations.add(roomView.getAnyPlayerCanSetOptionsCheckbox().addValueChangeHandler(event -> onPermissionChanged()));
+        handlerRegistrations.add(roomView.getPasswordRequiredCheckbox().addValueChangeHandler(event -> onPasswordRequiredChanged()));
     }
 
     private void startGame() {
@@ -103,6 +122,95 @@ public class RoomPresenter implements Presenter {
                 roomView.updateCreatorControls(room);
             }
         });
+    }
+
+    private void loadAvailableGamesForRoom() {
+        roomService.getAvailableGames(new AsyncCallback<ArrayList<GameDefinition>>() {
+            @Override public void onFailure(Throwable t) {
+                GWT.log("Failed to load games for room: " + t.getMessage());
+            }
+            @Override public void onSuccess(ArrayList<GameDefinition> games) {
+                roomView.populateGameSelector(games);
+                roomView.setSelectedGame(knownGameId);
+                if (knownGameId != null) {
+                    fetchGameOptionDefs(knownGameId);
+                }
+            }
+        });
+    }
+
+    private void onGameSelectorChanged() {
+        String gameId = roomView.getSelectedGameId();
+        if (gameId == null || gameId.equals(knownGameId)) return;
+        roomService.setRoomGame(room.getId(), gameId, new AsyncCallback<Void>() {
+            @Override public void onFailure(Throwable t) {
+                String msg = t instanceof RoomServiceException ? t.getMessage() : "Failed to set game";
+                AudioPlayer.errorAlert(msg);
+                roomView.setSelectedGame(knownGameId);
+            }
+            @Override public void onSuccess(Void v) {}
+        });
+    }
+
+    private void onOptionsButtonClicked() {
+        room.setGameOptions(new HashMap<>(knownGameOptions));
+        presenterManager.switchToGameOptions(room, gameOptionDefs);
+    }
+
+    private void onPermissionChanged() {
+        boolean anyGame = roomView.getAnyPlayerCanSelectGameCheckbox().getValue();
+        boolean anyOpts = roomView.getAnyPlayerCanSetOptionsCheckbox().getValue();
+        roomService.setRoomPermissions(room.getId(), anyGame, anyOpts, new AsyncCallback<Void>() {
+            @Override public void onFailure(Throwable t) {
+                GWT.log("Failed to set permissions: " + t.getMessage());
+            }
+            @Override public void onSuccess(Void v) {}
+        });
+    }
+
+    private void onPasswordRequiredChanged() {
+        boolean enabled = roomView.getPasswordRequiredCheckbox().getValue();
+        roomService.setRoomPassword(room.getId(), enabled, new AsyncCallback<Void>() {
+            @Override public void onFailure(Throwable t) {
+                GWT.log("Failed to set room password: " + t.getMessage());
+                roomView.getPasswordRequiredCheckbox().setValue(knownPasswordRequired, false);
+            }
+            @Override public void onSuccess(Void v) {}
+        });
+    }
+
+    private void fetchGameOptionDefs(String gameId) {
+        roomService.getGameOptions(gameId, new AsyncCallback<ArrayList<GameOption>>() {
+            @Override public void onFailure(Throwable t) {
+                GWT.log("Failed to fetch game options: " + t.getMessage());
+            }
+            @Override public void onSuccess(ArrayList<GameOption> options) {
+                if (options == null) options = new ArrayList<>();
+                final ArrayList<GameOption> defs = options;
+                String protocol = Window.Location.getProtocol();
+                String host = Window.Location.getHost();
+                String baseUrl = protocol + "//" + host + "/" + gameId;
+                GameTranslations.load(baseUrl, Cookie.getLanguage(), () -> {
+                    if (gameId.equals(knownGameId)) {
+                        gameOptionDefs = defs;
+                        roomView.renderOptionsDiff(gameOptionDefs, knownGameOptions);
+                    }
+                });
+            }
+        });
+    }
+
+    private void updateGameConfigControls(Room updatedRoom) {
+        boolean isCreator = updatedRoom.getCreatedByUserId() != null
+                && updatedRoom.getCreatedByUserId().equals(Cookie.getPlayerId());
+        boolean canSelectGame = isCreator || updatedRoom.isAnyPlayerCanSelectGame();
+        boolean canSetOptions = isCreator || updatedRoom.isAnyPlayerCanSetOptions();
+        roomView.setGameSelectorEnabled(canSelectGame);
+        roomView.setOptionsButtonEnabled(canSetOptions && knownGameId != null);
+        roomView.setPermissionsVisible(isCreator);
+        roomView.getAnyPlayerCanSelectGameCheckbox().setValue(updatedRoom.isAnyPlayerCanSelectGame(), false);
+        roomView.getAnyPlayerCanSetOptionsCheckbox().setValue(updatedRoom.isAnyPlayerCanSetOptions(), false);
+        roomView.getPasswordRequiredCheckbox().setValue(updatedRoom.hasPassword(), false);
     }
 
     private void sendMessageToServer(String inputText) {
@@ -242,6 +350,38 @@ public class RoomPresenter implements Presenter {
         } else {
             playerListInitialized = true;
         }
+        // ── Game config ──────────────────────────────────────────────
+        String newGameId = updatedRoom.getGameId();
+        HashMap<String, String> newGameOptions = updatedRoom.getGameOptions() != null
+                ? updatedRoom.getGameOptions() : new HashMap<>();
+
+        if (!Objects.equals(newGameId, knownGameId)) {
+            knownGameId = newGameId;
+            knownGameOptions = new HashMap<>();
+            gameOptionDefs.clear();
+            roomView.setSelectedGame(newGameId);
+            roomView.renderOptionsDiff(gameOptionDefs, knownGameOptions);
+            if (newGameId != null) {
+                fetchGameOptionDefs(newGameId);
+            }
+        } else if (!newGameOptions.equals(knownGameOptions)) {
+            knownGameOptions = new HashMap<>(newGameOptions);
+            roomView.renderOptionsDiff(gameOptionDefs, knownGameOptions);
+        }
+
+        // Keep this.room in sync for GameOptionsPresenter
+        room.setGameId(newGameId);
+        room.setGameOptions(new HashMap<>(newGameOptions));
+        room.setGameBaseUrl(updatedRoom.getGameBaseUrl());
+        room.setMinPlayers(updatedRoom.getMinPlayers());
+        room.setMaxPlayers(updatedRoom.getMaxPlayers());
+        room.setAnyPlayerCanSelectGame(updatedRoom.isAnyPlayerCanSelectGame());
+        room.setAnyPlayerCanSetOptions(updatedRoom.isAnyPlayerCanSetOptions());
+        room.setRoomPassword(updatedRoom.getRoomPassword());
+        knownPasswordRequired = updatedRoom.hasPassword();
+        roomView.updatePasswordDisplay(updatedRoom.getRoomPassword());
+
+        updateGameConfigControls(updatedRoom);
         roomView.updateCreatorControls(updatedRoom);
     }
 
@@ -278,6 +418,24 @@ public class RoomPresenter implements Presenter {
             r.addPlayerName(e.getKey(), e.getValue());
         for (Map.Entry<String, String> e : parseStringMap(obj.get("playerProfiles")).entrySet())
             r.addPlayerProfile(e.getKey(), e.getValue());
+        // gameOptions
+        JSONValue gameOptsVal = obj.get("gameOptions");
+        if (gameOptsVal != null) {
+            r.setGameOptions(parseStringMap(gameOptsVal));
+        }
+        // permission flags
+        JSONValue anySelectVal = obj.get("anyPlayerCanSelectGame");
+        if (anySelectVal != null && anySelectVal.isBoolean() != null) {
+            r.setAnyPlayerCanSelectGame(anySelectVal.isBoolean().booleanValue());
+        }
+        JSONValue anyOptsVal = obj.get("anyPlayerCanSetOptions");
+        if (anyOptsVal != null && anyOptsVal.isBoolean() != null) {
+            r.setAnyPlayerCanSetOptions(anyOptsVal.isBoolean().booleanValue());
+        }
+        JSONValue pwdVal = obj.get("roomPassword");
+        if (pwdVal != null && pwdVal.isString() != null) {
+            r.setRoomPassword(pwdVal.isString().stringValue());
+        }
         return r;
     }
 

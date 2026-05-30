@@ -1,13 +1,25 @@
 <!DOCTYPE ui:UiBinder SYSTEM "http://dl.google.com/gwt/DTD/xhtml.ent">
 <ui:UiBinder xmlns:ui="urn:ui:com.google.gwt.uibinder"
-             xmlns:g="urn:import:com.google.gwt.user.client.ui"
-             xmlns:c="urn:import:com.google.gwt.user.cellview.client">
+             xmlns:g="urn:import:com.google.gwt.user.client.ui">
     <g:VerticalPanel width="100%" styleName="roomMainPanel">
         <g:HTMLPanel width="100%">
             <h1 ui:field="roomTitle"/>
         </g:HTMLPanel>
         <g:HTMLPanel ui:field="langSelectorRow" styleName="room-lang-row"/>
         <g:HTMLPanel ui:field="playerPanel" styleName="playerSimulation"></g:HTMLPanel>
+        <g:FlowPanel ui:field="gameConfigPanel" styleName="room-game-config">
+            <g:FlowPanel styleName="room-game-row">
+                <g:ListBox ui:field="gameSelectorBox" styleName="room-game-select"/>
+                <g:Button ui:field="optionsButton" stylePrimaryName="optionsButton"/>
+            </g:FlowPanel>
+            <g:HTML ui:field="optionsDiffList" styleName="room-options-diff"/>
+            <g:Label ui:field="passwordDisplayLabel" visible="false" styleName="room-password-badge"/>
+            <g:FlowPanel ui:field="permissionsPanel" styleName="room-permissions-panel">
+                <g:CheckBox ui:field="anyPlayerCanSelectGameCheckbox"/>
+                <g:CheckBox ui:field="anyPlayerCanSetOptionsCheckbox"/>
+                <g:CheckBox ui:field="passwordRequiredCheckbox"/>
+            </g:FlowPanel>
+        </g:FlowPanel>
         <g:VerticalPanel ui:field="roomPanel" styleName="full-height">
             <g:VerticalPanel styleName="bottom-aligned">
                 <g:HorizontalPanel styleName="startRowPanel">

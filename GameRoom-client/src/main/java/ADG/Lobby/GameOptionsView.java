@@ -83,7 +83,7 @@ public class GameOptionsView extends Composite {
     public Button getConfirmButton() { return confirmButton; }
     public Button getCancelButton()  { return cancelButton; }
 
-    public void showGameSpecificOptions(ArrayList<GameOption> options) {
+    public void showGameSpecificOptions(ArrayList<GameOption> options, HashMap<String, String> currentValues) {
         gameOptionKeys.clear();
         gameOptionWidgets.clear();
         // Remove all children after the heading (index 0)
@@ -95,13 +95,17 @@ public class GameOptionsView extends Composite {
             return;
         }
         for (GameOption option : options) {
+            // Prefer the room's stored value; fall back to the game-defined default.
+            String currentValue = (currentValues != null && currentValues.containsKey(option.getKey()))
+                    ? currentValues.get(option.getKey())
+                    : option.getDefaultValue();
             FlowPanel row = new FlowPanel();
             row.addStyleName("game-options-field-inline");
             Widget inputWidget;
             if ("BOOLEAN".equals(option.getType())) {
                 CheckBox cb = new CheckBox(GameTranslations.translate(option.getLabelKey()));
                 cb.addStyleName("game-options-checkbox");
-                cb.setValue("true".equalsIgnoreCase(option.getDefaultValue()));
+                cb.setValue("true".equalsIgnoreCase(currentValue));
                 inputWidget = cb;
             } else if (option.getChoices() != null && !option.getChoices().isEmpty()) {
                 Label lbl = new Label(GameTranslations.translate(option.getLabelKey()));
@@ -112,9 +116,10 @@ public class GameOptionsView extends Composite {
                     String translatedChoice = GameTranslations.translate("gameOption.choice." + choice);
                     lb.addItem(translatedChoice, choice);
                 }
-                if (option.getDefaultValue() != null) {
+                String selectValue = currentValue != null ? currentValue : option.getDefaultValue();
+                if (selectValue != null) {
                     for (int i = 0; i < lb.getItemCount(); i++) {
-                        if (lb.getValue(i).equals(option.getDefaultValue())) {
+                        if (lb.getValue(i).equals(selectValue)) {
                             lb.setSelectedIndex(i);
                             break;
                         }
@@ -127,7 +132,7 @@ public class GameOptionsView extends Composite {
                 lbl.addStyleName("game-options-label");
                 TextBox tb = new TextBox();
                 tb.addStyleName("game-options-number-input");
-                tb.setText(option.getDefaultValue() != null ? option.getDefaultValue() : "");
+                tb.setText(currentValue != null ? currentValue : "");
                 row.add(lbl);
                 inputWidget = tb;
             }
