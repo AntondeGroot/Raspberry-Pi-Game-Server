@@ -1,6 +1,7 @@
 package ADG.services;
 
 import ADG.Lobby.GameDefinition;
+import ADG.Lobby.GameOption;
 import ADG.Lobby.GameStatus;
 import ADG.Lobby.Room;
 import ADG.Lobby.RoomServiceException;
@@ -8,6 +9,7 @@ import ADG.config.GamesConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.client.ResourceAccessException;
@@ -1170,5 +1172,67 @@ class RoomServiceImplTest {
                 () -> service.startGame(room.getId()));
         assertTrue(ex.getMessage().contains("No game selected"),
                 "Expected 'No game selected' in message but got: " + ex.getMessage());
+    }
+
+    // ── startGame: default options when none configured ──────────────────────
+
+    /**
+     * When a player selects a game but never opens the GameOptions dialog, the
+     * room's gameOptions map stays empty.  startGame must NOT simply omit the
+     * gameOptions field — that causes the game server to start with an empty /
+     * disabled configuration.  Instead it should fetch the game's declared
+     * defaults via GET /game-options and forward those as the initial options.
+     *
+     * <p>This test describes the <em>desired</em> behaviour and will therefore
+     * FAIL until the fix is applied (confirming the bug is present).
+     * The lenient stub for GET /game-options is intentional: before the fix the
+     * production code never calls that endpoint inside startGame, so a non-lenient
+     * stub would cause a spurious "unused stubbing" error that would hide the real
+     * failing assertion.
+     */
+    @Test
+    void startGameWithEmptyOptionsUsesGameServerDefaults() throws RoomServiceException {
+        // Room with a game selected but options never configured (dialog never opened)
+        Room room = buildRoom("Alpha");
+        room.setGameOptions(new HashMap<>());
+        room.getPlayerNames().put("p1", "Alice");
+        room.getPlayerNames().put("p2", "Bob");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        GameDefinition gameDef = gameDefWithBaseUrl("http://game-server");
+        gameDef.setMinPlayers(2);
+        when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDef));
+
+        // Default option declared by the game server: base = true
+        GameOption baseOption = new GameOption();
+        baseOption.setKey("base");
+        baseOption.setType("BOOLEAN");
+        baseOption.setDefaultValue("true");
+        // lenient: the current (buggy) code does not call GET /game-options inside
+        // startGame, so without lenient() Mockito's strict-stub check would fire an
+        // "unnecessary stubbing" failure that obscures the real assertion failure.
+        lenient().when(restTemplate.getForObject("http://game-server/game-options", GameOption[].class))
+                .thenReturn(new GameOption[]{baseOption});
+
+        when(restTemplate.postForObject(eq("http://game-server/games"), any(), eq(Map.class)))
+                .thenReturn(Map.of("sessionId", "test-session"));
+
+        service.startGame(room.getId());
+
+        // Inspect what was forwarded to POST /games (create-session request)
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+        verify(restTemplate).postForObject(eq("http://game-server/games"), captor.capture(), eq(Map.class));
+        Map<String, Object> sentRequest = captor.getValue();
+
+        // The game should be started with the defaults, not an absent/empty options block
+        assertNotNull(sentRequest.get("gameOptions"),
+                "gameOptions must be present in the create-session request even when the "
+                + "room's options map was never populated by the user");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> sentOptions = (Map<String, Object>) sentRequest.get("gameOptions");
+        assertEquals(true, sentOptions.get("base"),
+                "the 'base' default (true) must be forwarded to the game server");
     }
 }

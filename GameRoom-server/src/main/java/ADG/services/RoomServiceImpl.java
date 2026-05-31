@@ -268,11 +268,20 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
                 }
 
                 // 1. Create a game session
+                // Resolve which options to forward.  When the room's options map is
+                // empty (the user never opened the GameOptions dialog), fall back to
+                // the game server's own declared defaults so the game is never started
+                // with a blank / fully-disabled configuration.
+                HashMap<String, String> optionsToSend = room1.getGameOptions();
+                if (optionsToSend.isEmpty()) {
+                    optionsToSend = fetchDefaultOptions(baseUrl);
+                }
+
                 Map<String, Object> newGameRequest = new HashMap<>();
                 newGameRequest.put("roomName", room1.getName());
                 newGameRequest.put("maxPlayers", room1.getPlayerNames().size());
-                if (!room1.getGameOptions().isEmpty()) {
-                    newGameRequest.put("gameOptions", parseGameOptions(room1.getGameOptions()));
+                if (!optionsToSend.isEmpty()) {
+                    newGameRequest.put("gameOptions", parseGameOptions(optionsToSend));
                 }
                 Map sessionResponse;
                 try {
@@ -518,6 +527,29 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
             }
         }
         if (anyDeleted) emitLobbyUpdate();
+    }
+
+    /**
+     * Fetches the game-option definitions from the game server and returns a map
+     * of {@code key → defaultValue} for every option that has a non-null default.
+     * Returns an empty map if the endpoint is unreachable or returns no options,
+     * so the caller can still proceed without options in degraded scenarios.
+     */
+    private HashMap<String, String> fetchDefaultOptions(String baseUrl) {
+        try {
+            GameOption[] options = restTemplate.getForObject(baseUrl + "/game-options", GameOption[].class);
+            if (options == null) return new HashMap<>();
+            HashMap<String, String> defaults = new HashMap<>();
+            for (GameOption opt : options) {
+                if (opt.getDefaultValue() != null) {
+                    defaults.put(opt.getKey(), opt.getDefaultValue());
+                }
+            }
+            return defaults;
+        } catch (Exception e) {
+            logger.warn("Could not fetch default game options from {}: {}", baseUrl, e.getMessage());
+            return new HashMap<>();
+        }
     }
 
     private Map<String, Object> parseGameOptions(HashMap<String, String> raw) {
