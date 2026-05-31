@@ -234,6 +234,8 @@ public class RoomView extends Composite {
         var d3 = $wnd.d3;
         if (!d3) return;
 
+        // Stop any running simulation and bump the generation counter so stale
+        // timers / rAF callbacks from the previous render cancel themselves.
         if (container.__sim) { container.__sim.stop(); container.__sim = null; }
         var gen = (container.__gen || 0) + 1;
         container.__gen = gen;
@@ -243,200 +245,223 @@ public class RoomView extends Composite {
         while (container.firstChild) container.removeChild(container.firstChild);
         if (players.length === 0) return;
 
-        var width  = container.offsetWidth || 600;
-        var height = container.offsetHeight > 100 ? container.offsetHeight : 400;
-        var R      = 36;
-        var displaySize = R * 2;
+        // Defer measurement to the next animation frame so that CSS flex/grid
+        // layout has finished and offsetHeight reflects the real container size.
+        // This prevents the fallback path from being taken on mobile where the
+        // playerSimulation div is sized by flex after the GWT render call.
+        requestAnimationFrame(function() {
+            if (container.__gen !== gen) return;  // superseded by a later refresh
 
-        var svg = d3.select(container).append('svg')
-            .attr('width', '100%').attr('height', '100%');
+            var width  = container.offsetWidth  || 375;
+            var height = container.offsetHeight;
+            // Use the CSS min-height (120 px) as the floor rather than 400 px.
+            // An incorrect 400 px height would centre nodes at y=200 while only
+            // ~150 px are actually visible, pushing circles to the bottom edge.
+            if (height < 60) height = 120;
 
-        var defs = svg.append('defs');
+            // Scale the avatar radius to both the container size and the player
+            // count so circles never dominate the area regardless of room size:
+            //   rFromHeight – keeps circles proportional to container height
+            //   rFromArea   – shrinks circles as more players share the space
+            //                 (derived from the area each player gets on average)
+            var n = players.length;
+            var rFromHeight = Math.floor(height / 6);
+            var rFromArea   = Math.floor(Math.sqrt((width * height) / (n * Math.PI)) * 0.4);
+            var R = Math.min(36, Math.max(18, Math.min(rFromHeight, rFromArea)));
+            var displaySize = R * 2;
 
-        // glow filter
-        var filt = defs.append('filter').attr('id', 'node-glow');
-        filt.append('feGaussianBlur').attr('stdDeviation', '5').attr('result', 'blur');
-        var fm = filt.append('feMerge');
-        fm.append('feMergeNode').attr('in', 'blur');
-        fm.append('feMergeNode').attr('in', 'SourceGraphic');
+            var svg = d3.select(container).append('svg')
+                .attr('width', '100%').attr('height', '100%');
 
-        // clip paths for sprites
-        players.forEach(function(p) {
-            defs.append('clipPath').attr('id', 'clip-' + p.safeId)
-                .append('circle').attr('r', R);
-        });
+            var defs = svg.append('defs');
 
-        // full-mesh links
-        var links = [];
-        for (var i = 0; i < players.length; i++) {
-            for (var j = i + 1; j < players.length; j++) {
-                links.push({ source: i, target: j });
+            // glow filter
+            var filt = defs.append('filter').attr('id', 'node-glow');
+            filt.append('feGaussianBlur').attr('stdDeviation', '5').attr('result', 'blur');
+            var fm = filt.append('feMerge');
+            fm.append('feMergeNode').attr('in', 'blur');
+            fm.append('feMergeNode').attr('in', 'SourceGraphic');
+
+            // clip paths for sprites
+            players.forEach(function(p) {
+                defs.append('clipPath').attr('id', 'clip-' + p.safeId)
+                    .append('circle').attr('r', R);
+            });
+
+            // full-mesh links
+            var links = [];
+            for (var i = 0; i < players.length; i++) {
+                for (var j = i + 1; j < players.length; j++) {
+                    links.push({ source: i, target: j });
+                }
             }
-        }
 
-        var linkLayer = svg.append('g');
-        var linkSel = linkLayer.selectAll('line').data(links).enter().append('line')
-            .attr('stroke', '#8b5cf6')
-            .attr('stroke-width', 1)
-            .attr('stroke-opacity', 0.15);
+            var linkLayer = svg.append('g');
+            var linkSel = linkLayer.selectAll('line').data(links).enter().append('line')
+                .attr('stroke', '#8b5cf6')
+                .attr('stroke-width', 1)
+                .attr('stroke-opacity', 0.15);
 
-        var nodeGroup = svg.append('g').selectAll('.pnode')
-            .data(players).enter().append('g').attr('class', 'pnode')
-            .style('cursor', 'grab');
+            var nodeGroup = svg.append('g').selectAll('.pnode')
+                .data(players).enter().append('g').attr('class', 'pnode')
+                .style('cursor', 'grab');
 
-        // outer glow ring
-        var glowRing = nodeGroup.append('circle')
-            .attr('r', R + 5)
-            .attr('fill', 'none')
-            .attr('stroke', 'rgba(139, 92, 246, 0.5)')
-            .attr('stroke-width', 2)
-            .attr('filter', 'url(#node-glow)');
+            // outer glow ring
+            var glowRing = nodeGroup.append('circle')
+                .attr('r', R + 5)
+                .attr('fill', 'none')
+                .attr('stroke', 'rgba(139, 92, 246, 0.5)')
+                .attr('stroke-width', 2)
+                .attr('filter', 'url(#node-glow)');
 
-        // rotating dashed ring
-        nodeGroup.append('circle')
-            .attr('r', R + 14)
-            .attr('fill', 'none')
-            .attr('stroke', 'rgba(139, 92, 246, 0.35)')
-            .attr('stroke-width', 1)
-            .attr('stroke-dasharray', '10 6')
-            .attr('pointer-events', 'none')
-            .attr('class', 'node-spin-ring');
+            // rotating dashed ring
+            nodeGroup.append('circle')
+                .attr('r', R + 14)
+                .attr('fill', 'none')
+                .attr('stroke', 'rgba(139, 92, 246, 0.35)')
+                .attr('stroke-width', 1)
+                .attr('stroke-dasharray', '10 6')
+                .attr('pointer-events', 'none')
+                .attr('class', 'node-spin-ring');
 
-        // background circle
-        nodeGroup.append('circle')
-            .attr('r', R)
-            .attr('fill', 'rgba(28, 16, 64, 0.92)')
-            .attr('stroke', '#8b5cf6')
-            .attr('stroke-width', 2);
+            // background circle
+            nodeGroup.append('circle')
+                .attr('r', R)
+                .attr('fill', 'rgba(28, 16, 64, 0.92)')
+                .attr('stroke', '#8b5cf6')
+                .attr('stroke-width', 2);
 
-        // Sprite image: position the full sheet so the desired sprite cell
-        // (inset-adjusted) lands exactly over the circle, then clip.
-        // x = -(srcX / srcW) * displaySize - R  places the cell's left edge at -R.
-        // width = imgW * displaySize / srcW  scales the sheet so srcW fills displaySize.
-        nodeGroup.append('image')
-            .attr('href', function(d) { return d.sheetUrl; })
-            .attr('preserveAspectRatio', 'none')
-            .attr('x', function(d) { return -(d.srcX / d.srcW) * displaySize - R; })
-            .attr('y', function(d) { return -(d.srcY / d.srcH) * displaySize - R; })
-            .attr('width',  function(d) { return d.imgW * displaySize / d.srcW; })
-            .attr('height', function(d) { return d.imgH * displaySize / d.srcH; })
-            .attr('clip-path', function(d) { return 'url(#clip-' + d.safeId + ')'; });
+            // Sprite image: position the full sheet so the desired sprite cell
+            // (inset-adjusted) lands exactly over the circle, then clip.
+            nodeGroup.append('image')
+                .attr('href', function(d) { return d.sheetUrl; })
+                .attr('preserveAspectRatio', 'none')
+                .attr('x', function(d) { return -(d.srcX / d.srcW) * displaySize - R; })
+                .attr('y', function(d) { return -(d.srcY / d.srcH) * displaySize - R; })
+                .attr('width',  function(d) { return d.imgW * displaySize / d.srcW; })
+                .attr('height', function(d) { return d.imgH * displaySize / d.srcH; })
+                .attr('clip-path', function(d) { return 'url(#clip-' + d.safeId + ')'; });
 
-        // name label
-        nodeGroup.append('text')
-            .attr('text-anchor', 'middle')
-            .attr('dy', R + 16)
-            .attr('fill', '#ede8ff')
-            .attr('font-size', '12px')
-            .attr('font-family', 'Nunito, sans-serif')
-            .attr('font-weight', '600')
-            .text(function(d) { return d.name; });
+            // name label
+            nodeGroup.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', R + 16)
+                .attr('fill', '#ede8ff')
+                .attr('font-size', '12px')
+                .attr('font-family', 'Nunito, sans-serif')
+                .attr('font-weight', '600')
+                .text(function(d) { return d.name; });
 
-        var chargeForce = d3.forceManyBody().strength(-240);
-        var linkForce   = d3.forceLink(links).distance(160).strength(0.06);
+            // Scale forces proportionally with R so the layout feels the same
+            // regardless of container size.
+            var scale = R / 36;
+            var chargeForce = d3.forceManyBody().strength(-240 * scale);
+            var linkForce   = d3.forceLink(links).distance(160 * scale).strength(0.06);
 
-        var sim = d3.forceSimulation(players)
-            .force('center',    d3.forceCenter(width / 2, height / 2))
-            .force('charge',    chargeForce)
-            .force('collision', d3.forceCollide(R + 24))
-            .force('link',      linkForce)
-            .alphaTarget(0.04)
-            .alphaDecay(0.01)
-            .velocityDecay(0.55);
+            var sim = d3.forceSimulation(players)
+                .force('center',    d3.forceCenter(width / 2, height / 2))
+                .force('charge',    chargeForce)
+                .force('collision', d3.forceCollide(R + 24 * scale))
+                .force('link',      linkForce)
+                .alphaTarget(0.04)
+                .alphaDecay(0.01)
+                .velocityDecay(0.55);
 
-        // pulsate repulsion and link distance on independent slow sine waves
-        var myGen = gen;
-        d3.timer(function(elapsed) {
-            if (container.__gen !== myGen) return true;
-            var t = elapsed / 1000;
-            chargeForce.strength(-240 + Math.sin(t * 0.45) * 90);
-            linkForce.distance(160 + Math.sin(t * 0.3) * 55);
-        });
-
-        sim.on('tick', function() {
-            nodeGroup.attr('transform', function(d) {
-                d.x = Math.max(R + 6, Math.min(width  - R - 6, d.x));
-                d.y = Math.max(R + 6, Math.min(height - R - 20, d.y));
-                return 'translate(' + d.x + ',' + d.y + ')';
-            });
-            linkSel
-                .attr('x1', function(d) { return d.source.x; })
-                .attr('y1', function(d) { return d.source.y; })
-                .attr('x2', function(d) { return d.target.x; })
-                .attr('y2', function(d) { return d.target.y; });
-        });
-
-        // drag behaviour
-        var drag = d3.drag()
-            .on('start', function(event, d) {
-                if (!event.active) sim.alphaTarget(0.2).restart();
-                d.fx = d.x; d.fy = d.y;
-                d3.select(this).style('cursor', 'grabbing');
-            })
-            .on('drag', function(event, d) {
-                d.fx = event.x; d.fy = event.y;
-            })
-            .on('end', function(event, d) {
-                if (!event.active) sim.alphaTarget(0.04);
-                d.fx = null; d.fy = null;
-                d3.select(this).style('cursor', 'grab');
-            });
-        nodeGroup.call(drag);
-
-        // pulsing glow rings
-        function pulseNode(el) {
-            d3.select(el).transition()
-                .duration(1400 + Math.random() * 600)
-                .ease(d3.easeSinInOut)
-                .attr('r', R + 9)
-                .attr('stroke-opacity', 0.9)
-                .transition()
-                .duration(1400 + Math.random() * 600)
-                .ease(d3.easeSinInOut)
-                .attr('r', R + 4)
-                .attr('stroke-opacity', 0.3)
-                .on('end', function() { pulseNode(this); });
-        }
-        glowRing.each(function() { pulseNode(this); });
-
-        // pulsing link opacity
-        function pulseLink(el) {
-            d3.select(el).transition()
-                .duration(1800 + Math.random() * 1200)
-                .ease(d3.easeSinInOut)
-                .attr('stroke-opacity', 0.45)
-                .transition()
-                .duration(1800 + Math.random() * 1200)
-                .ease(d3.easeSinInOut)
-                .attr('stroke-opacity', 0.05)
-                .on('end', function() { pulseLink(this); });
-        }
-        linkSel.each(function() { pulseLink(this); });
-
-        // sonar ping — expanding ring that fades out, staggered per node
-        nodeGroup.each(function(d, i) {
-            var el = this;
+            // pulsate repulsion and link distance on independent slow sine waves
             var myGen = gen;
-            $wnd.setTimeout(function pingLoop() {
-                if (container.__gen !== myGen) return;
-                d3.select(el).insert('circle', ':first-child')
-                    .attr('r', R + 5)
-                    .attr('fill', 'none')
-                    .attr('stroke', 'rgba(139, 92, 246, 0.65)')
-                    .attr('stroke-width', 2)
-                    .attr('pointer-events', 'none')
-                    .transition()
-                    .duration(2400)
-                    .ease(d3.easeLinear)
-                    .attr('r', R + 48)
-                    .attr('stroke-opacity', 0)
-                    .attr('stroke-width', 0.4)
-                    .remove();
-                $wnd.setTimeout(pingLoop, 3200 + Math.random() * 800);
-            }, i * 1000);
-        });
+            d3.timer(function(elapsed) {
+                if (container.__gen !== myGen) return true;
+                var t = elapsed / 1000;
+                chargeForce.strength((-240 + Math.sin(t * 0.45) * 90) * scale);
+                linkForce.distance((160 + Math.sin(t * 0.3) * 55) * scale);
+            });
 
-        container.__sim = sim;
+            sim.on('tick', function() {
+                nodeGroup.attr('transform', function(d) {
+                    d.x = Math.max(R + 6, Math.min(width  - R - 6, d.x));
+                    d.y = Math.max(R + 6, Math.min(height - R - 20, d.y));
+                    return 'translate(' + d.x + ',' + d.y + ')';
+                });
+                linkSel
+                    .attr('x1', function(d) { return d.source.x; })
+                    .attr('y1', function(d) { return d.source.y; })
+                    .attr('x2', function(d) { return d.target.x; })
+                    .attr('y2', function(d) { return d.target.y; });
+            });
+
+            // drag behaviour
+            var drag = d3.drag()
+                .on('start', function(event, d) {
+                    if (!event.active) sim.alphaTarget(0.2).restart();
+                    d.fx = d.x; d.fy = d.y;
+                    d3.select(this).style('cursor', 'grabbing');
+                })
+                .on('drag', function(event, d) {
+                    d.fx = event.x; d.fy = event.y;
+                })
+                .on('end', function(event, d) {
+                    if (!event.active) sim.alphaTarget(0.04);
+                    d.fx = null; d.fy = null;
+                    d3.select(this).style('cursor', 'grab');
+                });
+            nodeGroup.call(drag);
+
+            // pulsing glow rings
+            function pulseNode(el) {
+                d3.select(el).transition()
+                    .duration(1400 + Math.random() * 600)
+                    .ease(d3.easeSinInOut)
+                    .attr('r', R + 9)
+                    .attr('stroke-opacity', 0.9)
+                    .transition()
+                    .duration(1400 + Math.random() * 600)
+                    .ease(d3.easeSinInOut)
+                    .attr('r', R + 4)
+                    .attr('stroke-opacity', 0.3)
+                    .on('end', function() { pulseNode(this); });
+            }
+            glowRing.each(function() { pulseNode(this); });
+
+            // pulsing link opacity
+            function pulseLink(el) {
+                d3.select(el).transition()
+                    .duration(1800 + Math.random() * 1200)
+                    .ease(d3.easeSinInOut)
+                    .attr('stroke-opacity', 0.45)
+                    .transition()
+                    .duration(1800 + Math.random() * 1200)
+                    .ease(d3.easeSinInOut)
+                    .attr('stroke-opacity', 0.05)
+                    .on('end', function() { pulseLink(this); });
+            }
+            linkSel.each(function() { pulseLink(this); });
+
+            // sonar ping — expanding ring that fades out, staggered per node
+            var pingR = R + 5;
+            var pingMax = R + Math.round(48 * scale);
+            nodeGroup.each(function(d, i) {
+                var el = this;
+                $wnd.setTimeout(function pingLoop() {
+                    if (container.__gen !== myGen) return;
+                    d3.select(el).insert('circle', ':first-child')
+                        .attr('r', pingR)
+                        .attr('fill', 'none')
+                        .attr('stroke', 'rgba(139, 92, 246, 0.65)')
+                        .attr('stroke-width', 2)
+                        .attr('pointer-events', 'none')
+                        .transition()
+                        .duration(2400)
+                        .ease(d3.easeLinear)
+                        .attr('r', pingMax)
+                        .attr('stroke-opacity', 0)
+                        .attr('stroke-width', 0.4)
+                        .remove();
+                    $wnd.setTimeout(pingLoop, 3200 + Math.random() * 800);
+                }, i * 1000);
+            });
+
+            container.__sim = sim;
+        });
     }-*/;
 
     public void setAdminMode(boolean adminMode) {

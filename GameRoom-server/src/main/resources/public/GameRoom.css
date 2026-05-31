@@ -366,6 +366,16 @@ td, th, span, p, div, label {
   justify-content: center;
 }
 
+/* Embedded game settings iframe — the game renders its own options UI */
+.game-settings-frame {
+  width: 100%;
+  min-height: 480px;
+  border: none;
+  border-radius: 12px;
+  overflow: hidden;
+  display: block;
+}
+
 /* =============================================
    Buttons
    ============================================= */
@@ -1316,7 +1326,14 @@ table.full-height {
   .room-table-header-cell {
     font-size: 13px;
     padding: 8px 6px;
-    letter-spacing: 0;  /* neutralise the desktop 0.08em so headers don't overflow their max-content column */
+    letter-spacing: 0;
+  }
+
+  /* On mobile, switch header cells to the same font family as data cells.
+     Rajdhani bold renders wider than Nunito for the same text, causing the
+     header to overflow max-content column tracks that are sized by data cells. */
+  .room-table-header-cell {
+    font-family: 'Nunito', system-ui, sans-serif;
   }
 
   .joinRoomButton {
@@ -1463,12 +1480,23 @@ table.full-height {
   /* Simulation div and SVG fill the available height */
   .playerSimulation {
     flex: 1;
-    height: 100%;
-    min-height: 150px;
+    /* Drop height:100% — flex:1 is enough, and mixing both in a table-as-flex
+       layout can cause a circular dependency that inflates the element height.  */
+    min-height: 120px;
+    max-height: 220px;  /* cap: prevents profiles from dominating the screen */
+    overflow: hidden;   /* explicit clip: guards against SVG nodes drifting out */
   }
 
   .playerSimulation svg {
     height: 100%;
+    display: block;
+  }
+
+  /* Ensure the game-config panel always sits above the simulation's stacking
+     context so the drop-down and checkboxes remain clickable.                 */
+  .room-game-config {
+    position: relative;
+    z-index: 1;
   }
 
   /* Undo absolute bottom-pinning — chat flows at the bottom of the flex column */

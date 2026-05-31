@@ -154,7 +154,7 @@ public class RoomPresenter implements Presenter {
 
     private void onOptionsButtonClicked() {
         room.setGameOptions(new HashMap<>(knownGameOptions));
-        presenterManager.switchToGameOptions(room, gameOptionDefs);
+        presenterManager.switchToGameOptions(room);
     }
 
     private void onPermissionChanged() {

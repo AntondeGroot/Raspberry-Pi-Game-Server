@@ -1,23 +1,25 @@
 package ADG.Lobby;
 
-import ADG.Utils.GameTranslations;
 import ADG.Utils.LanguageSelectorWidget;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
+import com.google.gwt.http.client.URL;
+import com.google.gwt.json.client.JSONObject;
+import com.google.gwt.json.client.JSONParser;
+import com.google.gwt.json.client.JSONString;
+import com.google.gwt.json.client.JSONValue;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
 import com.google.gwt.user.client.ui.Button;
 import com.google.gwt.user.client.ui.CheckBox;
 import com.google.gwt.user.client.ui.Composite;
 import com.google.gwt.user.client.ui.FlowPanel;
+import com.google.gwt.user.client.ui.Frame;
 import com.google.gwt.user.client.ui.HTML;
 import com.google.gwt.user.client.ui.Label;
-import com.google.gwt.user.client.ui.ListBox;
 import com.google.gwt.user.client.ui.TextBox;
 import com.google.gwt.user.client.ui.Widget;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 
 public class GameOptionsView extends Composite {
 
@@ -27,27 +29,29 @@ public class GameOptionsView extends Composite {
     @UiField HTML      pageTitle;
     @UiField FlowPanel langSelectorRow;
     @UiField HTML      roomSettingsTitle;
-    @UiField HTML      gameSettingsTitle;
-    @UiField FlowPanel gameSpecificOptionsPanel;
     @UiField CheckBox  uniqueProfilePicsCheckbox;
     @UiField FlowPanel maxPlayersField;
     @UiField Label     maxPlayersLabel;
     @UiField TextBox   maxPlayersInput;
     @UiField Label     maxPlayersRangeHint;
+    @UiField Frame     gameSettingsFrame;
     @UiField Button    confirmButton;
     @UiField Button    cancelButton;
 
     private int minBound;
     private int maxBound;
-    private final ArrayList<String> gameOptionKeys = new ArrayList<>();
-    private final ArrayList<Widget> gameOptionWidgets = new ArrayList<>();
+
+    /**
+     * Last game-specific options received from the embedded game settings iframe
+     * via postMessage. Null when no iframe is shown.
+     */
+    private HashMap<String, String> iframeOptions = null;
 
     public GameOptionsView() {
         initWidget(uiBinder.createAndBindUi(this));
         langSelectorRow.add(new LanguageSelectorWidget());
         pageTitle.setHTML("<h1>" + I18n.c().gameOptions() + "</h1>");
         roomSettingsTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().roomSettings() + "</h2>");
-        gameSettingsTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().gameSettings() + "</h2>");
         uniqueProfilePicsCheckbox.setText(I18n.c().uniqueProfilePictures());
         maxPlayersLabel.setText(I18n.c().maximumNumberOfPlayers());
         cancelButton.setText(I18n.c().cancel());
@@ -64,6 +68,63 @@ public class GameOptionsView extends Composite {
             maxPlayersInput.setText(String.valueOf(maxBound));
             maxPlayersRangeHint.setText("(" + minBound + " – " + maxBound + ")");
         }
+    }
+
+    /**
+     * Embed the game's own settings page in an iframe so it can show its
+     * native visuals (option chips, sheet preview, etc.). The game will
+     * postMessage the selected options back whenever they change.
+     *
+     * @param baseUrl   the game server's public base URL (e.g. "https://host/qwixx")
+     * @param lang      the current UI language code (e.g. "en", "nl")
+     * @param currentOptions  the options already stored on the room (may be empty)
+     */
+    public void showGameSettingsFrame(String baseUrl, String lang,
+                                      HashMap<String, String> currentOptions) {
+        if (baseUrl == null || baseUrl.isEmpty()) {
+            gameSettingsFrame.setVisible(false);
+            return;
+        }
+
+        // Serialise current options as a JSON string so the iframe can pre-populate its form.
+        String optionsParam = "";
+        if (currentOptions != null && !currentOptions.isEmpty()) {
+            JSONObject json = new JSONObject();
+            for (String key : currentOptions.keySet()) {
+                json.put(key, new JSONString(currentOptions.get(key)));
+            }
+            optionsParam = "&options=" + URL.encodeQueryString(json.toString());
+        }
+
+        String url = baseUrl + "/settings?embed=1&lang=" + URL.encodeQueryString(lang) + optionsParam;
+        GWT.log("Embedding game settings frame: " + url);
+        gameSettingsFrame.setUrl(url);
+        gameSettingsFrame.setVisible(true);
+
+        setupMessageListener();
+    }
+
+    /** Called from JSNI when the iframe posts a 'qwixx-options-changed' message. */
+    void onIframeMessage(String optionsJson) {
+        try {
+            JSONValue val = JSONParser.parseStrict(optionsJson);
+            JSONObject obj = val.isObject();
+            if (obj == null) return;
+            HashMap<String, String> opts = new HashMap<>();
+            for (String key : obj.keySet()) {
+                JSONValue v = obj.get(key);
+                if (v.isString() != null) opts.put(key, v.isString().stringValue());
+                else opts.put(key, v.toString());
+            }
+            iframeOptions = opts;
+        } catch (Exception e) {
+            GWT.log("Failed to parse iframe options: " + e.getMessage());
+        }
+    }
+
+    /** Returns the last options received from the game settings iframe, or null if not available. */
+    public HashMap<String, String> getIframeOptions() {
+        return iframeOptions;
     }
 
     public boolean isUniqueProfilePics() { return uniqueProfilePicsCheckbox.getValue(); }
@@ -83,135 +144,25 @@ public class GameOptionsView extends Composite {
     public Button getConfirmButton() { return confirmButton; }
     public Button getCancelButton()  { return cancelButton; }
 
-    public void showGameSpecificOptions(ArrayList<GameOption> options, HashMap<String, String> currentValues) {
-        gameOptionKeys.clear();
-        gameOptionWidgets.clear();
-        // Remove all children after the heading (index 0)
-        while (gameSpecificOptionsPanel.getWidgetCount() > 1) {
-            gameSpecificOptionsPanel.remove(1);
-        }
-        if (options == null || options.isEmpty()) {
-            gameSpecificOptionsPanel.setVisible(false);
-            return;
-        }
-        for (GameOption option : options) {
-            // Prefer the room's stored value; fall back to the game-defined default.
-            String currentValue = (currentValues != null && currentValues.containsKey(option.getKey()))
-                    ? currentValues.get(option.getKey())
-                    : option.getDefaultValue();
-            FlowPanel row = new FlowPanel();
-            row.addStyleName("game-options-field-inline");
-            Widget inputWidget;
-            if ("BOOLEAN".equals(option.getType())) {
-                CheckBox cb = new CheckBox(GameTranslations.translate(option.getLabelKey()));
-                cb.addStyleName("game-options-checkbox");
-                cb.setValue("true".equalsIgnoreCase(currentValue));
-                inputWidget = cb;
-            } else if (option.getChoices() != null && !option.getChoices().isEmpty()) {
-                Label lbl = new Label(GameTranslations.translate(option.getLabelKey()));
-                lbl.addStyleName("game-options-label");
-                ListBox lb = new ListBox();
-                lb.addStyleName("game-options-select");
-                for (String choice : option.getChoices()) {
-                    String translatedChoice = GameTranslations.translate("gameOption.choice." + choice);
-                    lb.addItem(translatedChoice, choice);
-                }
-                String selectValue = currentValue != null ? currentValue : option.getDefaultValue();
-                if (selectValue != null) {
-                    for (int i = 0; i < lb.getItemCount(); i++) {
-                        if (lb.getValue(i).equals(selectValue)) {
-                            lb.setSelectedIndex(i);
-                            break;
-                        }
-                    }
-                }
-                row.add(lbl);
-                inputWidget = lb;
-            } else {
-                Label lbl = new Label(GameTranslations.translate(option.getLabelKey()));
-                lbl.addStyleName("game-options-label");
-                TextBox tb = new TextBox();
-                tb.addStyleName("game-options-number-input");
-                tb.setText(currentValue != null ? currentValue : "");
-                row.add(lbl);
-                inputWidget = tb;
+    // ── postMessage bridge ────────────────────────────────────────────────────
+
+    private native void setupMessageListener() /*-{
+        var self = this;
+        var handler = function(event) {
+            if (event.data && event.data.type === 'qwixx-options-changed'
+                    && event.data.options) {
+                var json = JSON.stringify(event.data.options);
+                self.@ADG.Lobby.GameOptionsView::onIframeMessage(Ljava/lang/String;)(json);
             }
-            row.add(inputWidget);
-            if (option.getDescriptionKey() != null && !option.getDescriptionKey().isEmpty()) {
-                Label desc = new Label(GameTranslations.translate(option.getDescriptionKey()));
-                desc.addStyleName("game-options-description");
-                row.add(desc);
-            }
-            gameSpecificOptionsPanel.add(row);
-            gameOptionKeys.add(option.getKey());
-            gameOptionWidgets.add(inputWidget);
+        };
+        $wnd._gameOptionsMessageHandler = handler;
+        $wnd.addEventListener('message', handler);
+    }-*/;
+
+    public native void tearDownMessageListener() /*-{
+        if ($wnd._gameOptionsMessageHandler) {
+            $wnd.removeEventListener('message', $wnd._gameOptionsMessageHandler);
+            $wnd._gameOptionsMessageHandler = null;
         }
-        gameSpecificOptionsPanel.setVisible(true);
-        applyMutualExclusions(options);
-    }
-
-    private void applyMutualExclusions(ArrayList<GameOption> options) {
-        HashSet<String> wiredPairs = new HashSet<>();
-        for (GameOption option : options) {
-            ArrayList<String> incompatibles = option.getIncompatibleWith();
-            if (incompatibles == null || incompatibles.isEmpty()) continue;
-            for (String otherKey : incompatibles) {
-                String pairKey = option.getKey().compareTo(otherKey) < 0
-                        ? option.getKey() + "|" + otherKey
-                        : otherKey + "|" + option.getKey();
-                if (wiredPairs.add(pairKey)) {
-                    wireMutualExclusion(option.getKey(), otherKey);
-                }
-            }
-        }
-    }
-
-    private void wireMutualExclusion(String keyA, String keyB) {
-        int idxA = gameOptionKeys.indexOf(keyA);
-        int idxB = gameOptionKeys.indexOf(keyB);
-        if (idxA < 0 || idxB < 0) return;
-        Widget wA = gameOptionWidgets.get(idxA);
-        Widget wB = gameOptionWidgets.get(idxB);
-        if (!(wA instanceof CheckBox) || !(wB instanceof CheckBox)) return;
-        CheckBox cbA = (CheckBox) wA;
-        CheckBox cbB = (CheckBox) wB;
-
-        // Apply initial state before wiring handlers
-        if (cbA.getValue())      setOptionDisabled(idxB, true);
-        else if (cbB.getValue()) setOptionDisabled(idxA, true);
-
-        cbA.addValueChangeHandler(e -> setOptionDisabled(idxB, e.getValue()));
-        cbB.addValueChangeHandler(e -> setOptionDisabled(idxA, e.getValue()));
-    }
-
-    private void setOptionDisabled(int idx, boolean disabled) {
-        Widget w = gameOptionWidgets.get(idx);
-        if (w instanceof CheckBox cb) {
-            if (disabled) cb.setValue(false);
-            cb.setEnabled(!disabled);
-        }
-        // Row index is offset by 1 because index 0 is the section heading.
-        Widget row = gameSpecificOptionsPanel.getWidget(idx + 1);
-        if (disabled) row.addStyleName("option-disabled");
-        else          row.removeStyleName("option-disabled");
-    }
-
-    public HashMap<String, String> collectGameOptions() {
-        if (gameOptionKeys.isEmpty()) return null;
-        HashMap<String, String> result = new HashMap<>();
-        for (int i = 0; i < gameOptionKeys.size(); i++) {
-            Widget w = gameOptionWidgets.get(i);
-            String value;
-            if (w instanceof CheckBox) {
-                value = String.valueOf(((CheckBox) w).getValue());
-            } else if (w instanceof ListBox) {
-                ListBox lb = (ListBox) w;
-                value = lb.getValue(lb.getSelectedIndex());
-            } else {
-                value = ((TextBox) w).getText().trim();
-            }
-            result.put(gameOptionKeys.get(i), value);
-        }
-        return result;
-    }
+    }-*/;
 }

@@ -121,7 +121,7 @@ public class App implements EntryPoint {
 				}
 				public void onSuccess(Room room) {
 					if (room == null) { presenterManager.switchToLobby(); return; }
-					presenterManager.switchToGameOptions(room, presenterManager.getPreloadedGameOptions());
+					presenterManager.switchToGameOptions(room);
 				}
 			});
 		} else if (token.startsWith("character=")) {

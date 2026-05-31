@@ -19,9 +19,7 @@
                 </g:FlowPanel>
             </g:FlowPanel>
         </g:FlowPanel>
-        <g:FlowPanel ui:field="gameSpecificOptionsPanel" styleName="game-options-card" visible="false">
-            <g:HTML ui:field="gameSettingsTitle"><h2 class="section-title">Game Settings</h2></g:HTML>
-        </g:FlowPanel>
+        <g:Frame ui:field="gameSettingsFrame" styleName="game-settings-frame" visible="false"/>
         <g:FlowPanel styleName="game-options-actions">
             <g:Button ui:field="cancelButton" text="Cancel" stylePrimaryName="cancelButton"/>
             <g:Button ui:field="confirmButton" text="Continue" stylePrimaryName="confirmButton"/>

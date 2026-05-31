@@ -3,14 +3,12 @@ package ADG.Lobby;
 import ADG.Presenter;
 import ADG.PresenterManager;
 import ADG.Utils.Cookie;
-import ADG.Utils.GameTranslations;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.event.shared.HandlerRegistration;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
-import java.util.ArrayList;
 import java.util.HashMap;
 
 public class GameOptionsPresenter implements Presenter {
@@ -21,19 +19,13 @@ public class GameOptionsPresenter implements Presenter {
     private final RoomServiceAsync roomService;
     private HandlerRegistration confirmReg;
     private HandlerRegistration cancelReg;
-    private final ArrayList<GameOption> preloadedOptions;
     private boolean stopped = false;
 
     public GameOptionsPresenter(GameOptionsView view, Room room, PresenterManager presenterManager, RoomServiceAsync roomService) {
-        this(view, room, presenterManager, roomService, null);
-    }
-
-    public GameOptionsPresenter(GameOptionsView view, Room room, PresenterManager presenterManager, RoomServiceAsync roomService, ArrayList<GameOption> preloadedOptions) {
         this.view = view;
         this.room = room;
         this.presenterManager = presenterManager;
         this.roomService = roomService;
-        this.preloadedOptions = preloadedOptions;
     }
 
     @Override
@@ -41,36 +33,37 @@ public class GameOptionsPresenter implements Presenter {
         view.init(room);
         confirmReg = view.getConfirmButton().addClickHandler(e -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); onConfirm(); });
         cancelReg  = view.getCancelButton().addClickHandler(e -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); onCancel(); });
-        if (preloadedOptions != null) {
-            showOptionsAfterLoadingTranslations(preloadedOptions);
-        } else if (room.getGameId() != null) {
-            roomService.getGameOptions(room.getGameId(), new AsyncCallback<ArrayList<GameOption>>() {
-                @Override public void onFailure(Throwable t) {}
-                @Override public void onSuccess(ArrayList<GameOption> options) {
-                    if (!stopped) showOptionsAfterLoadingTranslations(options);
-                }
-            });
+
+        // Embed the game's own settings UI in an iframe so it can render its
+        // native visuals (option chips, sheet preview, etc.).
+        // The iframe pushes option changes back to this page via postMessage.
+        String baseUrl = resolvePublicBaseUrl();
+        if (baseUrl != null) {
+            view.showGameSettingsFrame(baseUrl, Cookie.getLanguage().name().toLowerCase(),
+                    room.getGameOptions());
         }
     }
 
-    private void showOptionsAfterLoadingTranslations(ArrayList<GameOption> options) {
-        String baseUrl = room.getGameBaseUrl();
-
-        // If baseUrl is an internal/localhost address, construct the public URL from the game ID
-        if (baseUrl == null || baseUrl.isEmpty() || baseUrl.contains("localhost")) {
+    /** Returns the public base URL for the game, or null if none is available. */
+    private String resolvePublicBaseUrl() {
+        String base = room.getGameBaseUrl();
+        if (base != null && !base.isEmpty() && !base.contains("localhost")) {
+            return base;
+        }
+        String gameId = room.getGameId();
+        if (gameId != null && !gameId.isEmpty()) {
+            // Derive the URL from the current page's origin
             String protocol = Window.Location.getProtocol();
             String host = Window.Location.getHost();
-            baseUrl = protocol + "//" + host + "/" + room.getGameId();
-            GWT.log("Using public baseUrl for translations: " + baseUrl);
+            return protocol + "//" + host + "/" + gameId;
         }
-        GameTranslations.load(baseUrl, Cookie.getLanguage(), () -> {
-            if (!stopped) view.showGameSpecificOptions(options, room.getGameOptions());
-        });
+        return null;
     }
 
     @Override
     public void stop() {
         stopped = true;
+        view.tearDownMessageListener();
         if (confirmReg != null) { confirmReg.removeHandler(); confirmReg = null; }
         if (cancelReg  != null) { cancelReg.removeHandler();  cancelReg  = null; }
     }
@@ -83,14 +76,19 @@ public class GameOptionsPresenter implements Presenter {
         }
         room.setMaxPlayers(maxPlayers);
         room.setUniqueProfilePics(view.isUniqueProfilePics());
-        HashMap<String, String> gameOpts = view.collectGameOptions();
+
+        // Use the options received from the game's own settings iframe.
+        // Fall back to whatever was already stored on the room if the iframe
+        // hasn't posted anything yet (e.g., user opened and immediately confirmed).
+        HashMap<String, String> gameOpts = view.getIframeOptions();
         if (gameOpts != null) {
             room.setGameOptions(gameOpts);
         }
-        // Persist the options to the server before proceeding, so joining players see them
+
         GWT.log("Updating room with ID: " + room.getId());
         roomService.updateRoom(room, new AsyncCallback<Void>() {
             @Override public void onFailure(Throwable t) {
+                if (stopped) return;
                 String errorMsg = "Unknown error";
                 if (t instanceof ADG.Lobby.RoomServiceException) {
                     errorMsg = t.getMessage();
