@@ -88,7 +88,7 @@ public class GameOptionsView extends Composite {
      * @param currentOptions  the options already stored on the room (may be empty)
      */
     public void showGameSettingsFrame(String baseUrl, String lang,
-                                      HashMap<String, String> currentOptions) {
+                                      HashMap<String, String> currentOptions, boolean isAdmin) {
         if (baseUrl == null || baseUrl.isEmpty()) {
             gameSettingsFrame.setVisible(false);
             return;
@@ -104,7 +104,8 @@ public class GameOptionsView extends Composite {
             optionsParam = "&options=" + URL.encodeQueryString(json.toString());
         }
 
-        String url = baseUrl + "/settings?embed=1&lang=" + URL.encodeQueryString(lang) + optionsParam;
+        String adminParam = isAdmin ? "&admin=1" : "";
+        String url = baseUrl + "/settings?embed=1&lang=" + URL.encodeQueryString(lang) + adminParam + optionsParam;
         GWT.log("Embedding game settings frame: " + url);
         gameSettingsFrame.setUrl(url);
         gameSettingsFrame.setVisible(true);

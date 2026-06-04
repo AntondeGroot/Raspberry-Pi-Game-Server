@@ -18,15 +18,17 @@ public class GameOptionsPresenter implements Presenter {
     private final Room room;
     private final PresenterManager presenterManager;
     private final RoomServiceAsync roomService;
+    private final boolean isAdmin;
     private HandlerRegistration confirmReg;
     private HandlerRegistration cancelReg;
     private boolean stopped = false;
 
-    public GameOptionsPresenter(GameOptionsView view, Room room, PresenterManager presenterManager, RoomServiceAsync roomService) {
+    public GameOptionsPresenter(GameOptionsView view, Room room, PresenterManager presenterManager, RoomServiceAsync roomService, boolean isAdmin) {
         this.view = view;
         this.room = room;
         this.presenterManager = presenterManager;
         this.roomService = roomService;
+        this.isAdmin = isAdmin;
     }
 
     @Override
@@ -46,7 +48,7 @@ public class GameOptionsPresenter implements Presenter {
             GWT.log("[GameOptions] resolvedUrl=" + baseUrl);
             if (baseUrl != null) {
                 view.showGameSettingsFrame(baseUrl, Cookie.getLanguage().name().toLowerCase(),
-                        room.getGameOptions());
+                        room.getGameOptions(), isAdmin);
             } else {
                 // URL could not be resolved — fall back to generic widgets.
                 GWT.log("[GameOptions] WARNING: baseUrl null despite embeddedSettings=true, falling back to generic options");

@@ -38,7 +38,7 @@ class GameOptionsPresenterTest {
         when(view.getConfirmButton()).thenReturn(confirmButton);
         when(view.getCancelButton()).thenReturn(cancelButton);
 
-        presenter = new GameOptionsPresenter(view, room, presenterManager, roomService);
+        presenter = new GameOptionsPresenter(view, room, presenterManager, roomService, false);
         presenter.start();
 
         ArgumentCaptor<ClickHandler> captor = ArgumentCaptor.forClass(ClickHandler.class);
