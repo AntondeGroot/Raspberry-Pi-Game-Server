@@ -161,7 +161,7 @@ public class RoomPresenter implements Presenter {
     private void onOptionsButtonClicked() {
         room.setGameOptions(new HashMap<>(knownGameOptions));
         syncEmbeddedSettingsFromDefs(knownGameId); // belt-and-suspenders: ensure flag is current
-        presenterManager.switchToGameOptions(room);
+        presenterManager.switchToGameOptions(room, isAdmin);
     }
 
     /**

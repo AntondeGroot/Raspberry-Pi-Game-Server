@@ -36,10 +36,10 @@ public class PresenterManager {
         switchPresenter(lobbyPresenter, lobbyView);
     }
 
-    public void switchToGameOptions(Room room) {
+    public void switchToGameOptions(Room room, boolean isAdmin) {
         currentRoom = room;
         History.newItem("settings=" + room.getId());
-        gameOptionsPresenter = new GameOptionsPresenter(gameOptionsView, room, this, roomServiceAsync);
+        gameOptionsPresenter = new GameOptionsPresenter(gameOptionsView, room, this, roomServiceAsync, isAdmin);
         switchPresenter(gameOptionsPresenter, gameOptionsView);
     }
 
