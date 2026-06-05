@@ -266,6 +266,9 @@ public class RoomPresenter implements Presenter {
     }
 
     private void leaveRoom() {
+        if (room.getStatus() == GameStatus.PLAYING) {
+            if (!Window.confirm(I18n.c().confirmLeavePlayingRoom())) return;
+        }
         removePlayerFromRoom();
         sendLeaveMessage();
         presenterManager.switchToLobby();
@@ -360,6 +363,10 @@ public class RoomPresenter implements Presenter {
             GWT.log("Navigating to game URL: " + url);
             Window.Location.replace(url);
             return;
+        }
+
+        if (updatedRoom.getStatus() == GameStatus.PLAYING) {
+            roomView.getLeaveRoomButton().setVisible(false);
         }
 
         HashMap<String, String> serverUserNames = updatedRoom.getPlayerNames();

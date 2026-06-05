@@ -20,4 +20,13 @@ public class SpriteSheetsController {
     public List<SheetDef> getSheets() {
         return config.getSheets();
     }
+
+    /**
+     * Returns the global (cross-sheet) profile-pic indices that belong to bot-only sheets
+     * and are not excluded. Qwixx uses this to assign robot avatars to computer players.
+     */
+    @GetMapping("/bot-profile-indices")
+    public List<Integer> getBotProfileIndices() {
+        return config.botProfileIndices();
+    }
 }

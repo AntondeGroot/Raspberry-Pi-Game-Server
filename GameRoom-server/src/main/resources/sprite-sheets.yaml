@@ -42,3 +42,12 @@ sprite-sheets:
       img-height: 1024
       inset-px: 6
       exclude: [2, 3, 4, 8, 9, 14]
+
+    - url: /robots.png
+      cols: 4
+      rows: 4
+      img-width: 1254
+      img-height: 1254
+      inset-px: 4
+      exclude: [10, 14]
+      bot-only: true

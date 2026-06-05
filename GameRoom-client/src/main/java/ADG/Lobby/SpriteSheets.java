@@ -21,8 +21,10 @@ public class SpriteSheets {
         final int insetPx;
         /** 0-based local indices that are excluded. */
         final int[] excluded;
+        /** When true, this sheet is reserved for bot/computer players and hidden from human selection. */
+        public final boolean botOnly;
 
-        Sheet(String url, int cols, int rows, int imgW, int imgH, int insetPx, int[] excluded) {
+        Sheet(String url, int cols, int rows, int imgW, int imgH, int insetPx, int[] excluded, boolean botOnly) {
             this.url      = url;
             this.cols     = cols;
             this.rows     = rows;
@@ -30,6 +32,7 @@ public class SpriteSheets {
             this.imgH     = imgH;
             this.insetPx  = insetPx;
             this.excluded = excluded;
+            this.botOnly  = botOnly;
         }
 
         int    total()  { return cols * rows; }
@@ -67,8 +70,9 @@ public class SpriteSheets {
             int    rows    = num(o, "rows",      4);
             int    imgW    = num(o, "imgWidth",  1024);
             int    imgH    = num(o, "imgHeight", 1024);
-            int    insetPx = num(o, "insetPx",  0);
-            int    total   = cols * rows;
+            int     insetPx = num(o, "insetPx",  0);
+            boolean botOnly = bool(o, "botOnly");
+            int     total   = cols * rows;
 
             // onlyInclude takes precedence over exclude (both 1-based in JSON)
             JSONValue onlyVal = o.get("onlyInclude");
@@ -99,7 +103,7 @@ public class SpriteSheets {
                 excluded = toIntArray(exList);
             }
 
-            sheets.add(new Sheet(url, cols, rows, imgW, imgH, insetPx, excluded));
+            sheets.add(new Sheet(url, cols, rows, imgW, imgH, insetPx, excluded, botOnly));
         }
     }
 
@@ -142,6 +146,11 @@ public class SpriteSheets {
     private static int num(JSONObject o, String key, int defaultVal) {
         JSONValue v = o.get(key);
         return (v != null && v.isNumber() != null) ? (int) v.isNumber().doubleValue() : defaultVal;
+    }
+
+    private static boolean bool(JSONObject o, String key) {
+        JSONValue v = o.get(key);
+        return v != null && v.isBoolean() != null && v.isBoolean().booleanValue();
     }
 
     private static int[] toIntArray(List<Integer> list) {

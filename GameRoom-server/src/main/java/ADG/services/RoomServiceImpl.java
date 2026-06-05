@@ -7,6 +7,7 @@ import ADG.Lobby.Room;
 import ADG.Lobby.RoomService;
 import ADG.Lobby.RoomServiceException;
 import ADG.config.GamesConfig;
+import ADG.config.SpriteSheetsConfig;
 import com.google.gwt.user.server.rpc.jakarta.RemoteServiceServlet;
 import jakarta.servlet.annotation.WebServlet;
 import java.net.HttpURLConnection;
@@ -44,6 +45,9 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
 
     @Autowired
     private GamesConfig gamesConfig;
+
+    @Autowired
+    private SpriteSheetsConfig spriteSheetsConfig;
 
     @Autowired
     private RoomStore roomStore;
@@ -93,7 +97,8 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
             throw new RoomServiceException("A room with this name already exists.");
         }
         roomStore.rooms.stream()
-                .filter(r -> r.getPlayerIds().contains(room.getCreatedByUserId()))
+                .filter(r -> r.getPlayerIds().contains(room.getCreatedByUserId())
+                          && r.getStatus() != GameStatus.PLAYING)
                 .findFirst()
                 .ifPresent(r -> removePlayerFromRoom(room.getCreatedByUserId(), r.getId()));
 
@@ -195,7 +200,8 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
     @Override
     public synchronized void addPlayerIdToRoom(String playerId, String roomId) {
         roomStore.rooms.stream()
-                .filter(r -> !r.getId().equals(roomId) && r.getPlayerIds().contains(playerId))
+                .filter(r -> !r.getId().equals(roomId) && r.getPlayerIds().contains(playerId)
+                          && r.getStatus() != GameStatus.PLAYING)
                 .findFirst()
                 .ifPresent(r -> removePlayerFromRoom(playerId, r.getId()));
 
@@ -216,6 +222,7 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
     public synchronized void removePlayerFromRoom(String playerId, String roomId) {
         for (Room room1 : roomStore.rooms) {
             if (room1.getId().equals(roomId)) {
+                if (room1.getStatus() == GameStatus.PLAYING) return;
                 room1.removePlayer(playerId);
                 if (room1.getStatus() == GameStatus.FULL && room1.getNrOfPlayers() < room1.getMaxPlayers()) {
                     room1.setStatus(GameStatus.WAITING);
@@ -316,10 +323,13 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
                         restTemplate.postForObject(playerUrl, playerRequest, Map.class);
                     }
 
-                    // 3. Start the game
+                    // 3. Start the game — include shuffled bot profile-pic indices so
+                    //    each bot gets a unique robot avatar from the bot-only sheet.
                     String startGameUrl = baseUrl + "/games/" + sessionId;
                     logger.debug("Starting game at: {}", startGameUrl);
-                    restTemplate.postForObject(startGameUrl, null, Void.class);
+                    Map<String, Object> startRequest = new HashMap<>();
+                    startRequest.put("botProfilePics", botProfileIndices());
+                    restTemplate.postForObject(startGameUrl, startRequest, Void.class);
                     logger.info("Game started successfully for room: {}", roomId);
                 } catch (RestClientException e) {
                     logger.error("Error during game start: {}", e.getMessage(), e);
@@ -551,6 +561,10 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
             logger.warn("Could not fetch default game options from {}: {}", baseUrl, e.getMessage());
             return new HashMap<>();
         }
+    }
+
+    private List<Integer> botProfileIndices() {
+        return spriteSheetsConfig.botProfileIndices();
     }
 
     private Map<String, Object> parseGameOptions(HashMap<String, String> raw) {

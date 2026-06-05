@@ -6,6 +6,7 @@ import ADG.Lobby.GameStatus;
 import ADG.Lobby.Room;
 import ADG.Lobby.RoomServiceException;
 import ADG.config.GamesConfig;
+import ADG.config.SpriteSheetsConfig;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,9 @@ class RoomServiceImplTest {
 
     @Mock
     private GamesConfig gamesConfig;
+
+    @Mock
+    private SpriteSheetsConfig spriteSheetsConfig;
 
     @Mock
     private RestTemplate restTemplate;
@@ -73,6 +77,12 @@ class RoomServiceImplTest {
         Field lobbySseRegistryField = RoomServiceImpl.class.getDeclaredField("lobbySseRegistry");
         lobbySseRegistryField.setAccessible(true);
         lobbySseRegistryField.set(service, lobbySseRegistry);
+
+        Field spriteSheetsConfigField = RoomServiceImpl.class.getDeclaredField("spriteSheetsConfig");
+        spriteSheetsConfigField.setAccessible(true);
+        spriteSheetsConfigField.set(service, spriteSheetsConfig);
+
+        lenient().when(spriteSheetsConfig.getSheets()).thenReturn(List.of());
 
         lenient().when(gamesConfig.findById(anyString())).thenReturn(Optional.empty());
         // Default: caller is the room creator used by buildRoom().

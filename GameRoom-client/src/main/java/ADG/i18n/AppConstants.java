@@ -70,4 +70,5 @@ public interface AppConstants extends Constants {
     String errSelectProfilePicture();
     String errProfileTaken();
     String confirmDeleteRoom();
+    String confirmLeavePlayingRoom();
 }

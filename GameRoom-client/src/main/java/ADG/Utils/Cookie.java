@@ -15,6 +15,8 @@ public class Cookie {
     private static final String ADMIN_HINT = "admin_hint";
 
     private static final long MILLIS_400_DAYS = 400L * 24L * 60L * 60L * 1000L;
+    private static final String UUID_PATTERN =
+            "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
     /**
      * Returns true when the {@code admin_hint} cookie is present.
@@ -31,8 +33,8 @@ public class Cookie {
     }
 
     public static void createPlayerIdCookie(){
-        Collection<String> cookieNames = Cookies.getCookieNames();
-        if(!cookieNames.contains(PLAYERID)){
+        String existing = Cookies.getCookie(PLAYERID);
+        if (existing == null || invalidUUID(existing)) {
             Cookies.setCookie(PLAYERID, UUID.get(), longTermExpiry(), null, "/", isSecure());
         }
     }
@@ -84,6 +86,10 @@ public class Cookie {
     private static void reloadWithLocale(String locale) {
         String hash = Window.Location.getHash();
         Window.Location.replace(Window.Location.getPath() + "?locale=" + locale + hash);
+    }
+
+    private static boolean invalidUUID(String value) {
+        return !value.matches(UUID_PATTERN);
     }
 
     private static Date longTermExpiry() {

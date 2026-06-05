@@ -120,7 +120,7 @@ public class CharacterSelectionPresenter implements Presenter {
 
         int globalOffset = 0;
         for (SpriteSheets.Sheet sheet : SpriteSheets.all()) {
-            loadSheet(sheet, globalOffset, takenIndices);
+            if (!sheet.botOnly) loadSheet(sheet, globalOffset, takenIndices);
             globalOffset += sheet.total();
         }
     }

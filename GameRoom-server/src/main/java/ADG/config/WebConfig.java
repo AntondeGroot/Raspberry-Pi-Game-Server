@@ -16,7 +16,7 @@ public class WebConfig implements WebMvcConfigurer {
         // Sprite-sheet images — filename is static (no content hash), so use a
         // week-long TTL rather than "forever".  If the images are ever replaced,
         // either rename them or append a query-string version to bust the cache.
-        registry.addResourceHandler("/profilepics*.png")
+        registry.addResourceHandler("/profilepics*.png", "/robots.png")
                 .addResourceLocations("classpath:/public/")
                 .setCacheControl(CacheControl.maxAge(7, TimeUnit.DAYS).cachePublic());
 
