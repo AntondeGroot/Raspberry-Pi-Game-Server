@@ -762,6 +762,23 @@ class RoomServiceImplTest {
         assertNotNull(service.getRoomById(room.getId()));
     }
 
+    @Test
+    void verifyGameSessionsExistResetsRoomToWaitingWhenGameFinished() {
+        Room room = buildPlayingRoom("Alpha", "session-1");
+        when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
+        // GET /games/{sid} returns status: FINISHED — matches Qwixx's GameInfo OpenAPI shape
+        when(restTemplate.getForObject("http://game-server/games/session-1", Map.class))
+                .thenReturn(Map.of("sessionId", "session-1", "status", "FINISHED",
+                                   "playerCount", 1, "maxPlayers", 4));
+
+        service.verifyGameSessionsExist();
+
+        Room updated = service.getRoomById(room.getId());
+        assertNotNull(updated, "room must still exist after game finishes");
+        assertEquals(GameStatus.WAITING, updated.getStatus(), "room must reset to WAITING");
+        assertNull(updated.getGameSessionId(), "session ID must be cleared");
+    }
+
     // ── SSE emit verification ────────────────────────────────────────────────
 
     @Test

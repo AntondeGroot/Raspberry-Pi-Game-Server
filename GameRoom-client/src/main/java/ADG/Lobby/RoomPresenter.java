@@ -36,6 +36,7 @@ public class RoomPresenter implements Presenter {
     private boolean playerListInitialized = false;
     private boolean isAdmin = false;
     private String knownGameId = null;
+    private GameStatus lastKnownStatus = null;
     private ArrayList<GameDefinition> availableGames = new ArrayList<>();
     private ArrayList<GameOption> gameOptionDefs = new ArrayList<>();
     private HashMap<String, String> knownGameOptions = new HashMap<>();
@@ -354,12 +355,19 @@ public class RoomPresenter implements Presenter {
 
         Room updatedRoom = parseRoom(obj);
 
-        if (updatedRoom.getStatus() == GameStatus.PLAYING && updatedRoom.getGameSessionId() != null) {
+        boolean gameJustStarted = lastKnownStatus != null
+                && lastKnownStatus != GameStatus.PLAYING
+                && updatedRoom.getStatus() == GameStatus.PLAYING;
+        lastKnownStatus = updatedRoom.getStatus();
+
+        if (gameJustStarted && updatedRoom.getGameSessionId() != null
+                && updatedRoom.getPlayerIds().contains(Cookie.getPlayerId())) {
             stop();
             String url = updatedRoom.getGameBaseUrl()
                     + "/?sessionid=" + updatedRoom.getGameSessionId()
                     + "&playerid=" + Cookie.getPlayerId()
-                    + "&locale=" + Cookie.getLanguage().name();
+                    + "&locale=" + Cookie.getLanguage().name()
+                    + "&roomid=" + updatedRoom.getId();
             GWT.log("Navigating to game URL: " + url);
             Window.Location.replace(url);
             return;

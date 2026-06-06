@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.core.Authentication;
@@ -51,6 +52,9 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
 
     @Autowired
     private RoomStore roomStore;
+
+    @Value("${server.port:4100}")
+    private int serverPort;
 
     @Autowired
     private RoomSseRegistry sseRegistry;
@@ -329,6 +333,7 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
                     logger.debug("Starting game at: {}", startGameUrl);
                     Map<String, Object> startRequest = new HashMap<>();
                     startRequest.put("botProfilePics", botProfileIndices());
+                    startRequest.put("callbackUrl", "http://localhost:" + serverPort + "/rooms/" + roomId + "/game-finished");
                     restTemplate.postForObject(startGameUrl, startRequest, Void.class);
                     logger.info("Game started successfully for room: {}", roomId);
                 } catch (RestClientException e) {
@@ -486,16 +491,28 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
             String baseUrl = gameDef.get().getBaseUrl();
             String sessionId = room.getGameSessionId();
 
+            Map<?, ?> gameInfo;
             try {
                 String gameUrl = baseUrl + "/games/" + sessionId;
                 logger.debug("Verifying game session exists at: {}", gameUrl);
-                restTemplate.getForObject(gameUrl, Map.class);
+                gameInfo = restTemplate.getForObject(gameUrl, Map.class);
                 logger.debug("Game session verified: {}", room.getId());
             } catch (RestClientException e) {
                 logger.warn("Game session no longer exists for room {}: {}", room.getId(), e.getMessage());
                 roomStore.deleteRoom(room.getId());
                 sseRegistry.emitClosed(room.getId());
                 anyDeleted = true;
+                continue;
+            }
+
+            if (gameInfo != null && "FINISHED".equals(gameInfo.get("status"))) {
+                logger.info("Game session finished for room {}, resetting to WAITING", room.getId());
+                room.setStatus(GameStatus.WAITING);
+                room.setGameSessionId(null);
+                roomStore.gameStateVersions.remove(room.getId());
+                roomStore.gameStateVersionTimestamps.remove(room.getId());
+                emitRoomUpdate(room.getId());
+                emitLobbyUpdate();
                 continue;
             }
 
