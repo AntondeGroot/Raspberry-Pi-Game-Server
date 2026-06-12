@@ -212,7 +212,6 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         for (Room room1 : roomStore.rooms) {
             if (room1.getId().equals(roomId)) {
                 room1.addPlayer(playerId);
-                roomStore.emptyRoomTimestamps.remove(room1.getId());
                 if (room1.getNrOfPlayers() >= room1.getMaxPlayers()) {
                     room1.setStatus(GameStatus.FULL);
                 }
@@ -234,9 +233,6 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
                 if (playerId.equals(room1.getCreatedByUserId()) && !room1.getPlayerIds().isEmpty()) {
                     String newCreator = room1.getPlayerIds().get(0);
                     room1.setCreatedByUserId(newCreator);
-                }
-                if (room1.getPlayerIds().isEmpty() && room1.getStatus() != GameStatus.PENDING) {
-                    roomStore.emptyRoomTimestamps.put(room1.getId(), System.currentTimeMillis());
                 }
             }
         }
@@ -450,20 +446,39 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         return reachable;
     }
 
+    /**
+     * Deletes rooms that have been abandoned — i.e. have had no live SSE connection
+     * for {@link #EMPTY_ROOM_TTL_MS}. A room's SSE stream is the presence signal:
+     * when every player closes their tab (or otherwise disconnects) the room would
+     * otherwise linger forever with phantom players in its list.
+     *
+     * PLAYING rooms are deliberately excluded: while a game is running the client
+     * navigates away from the GameRoom page to the game server, so a PLAYING room
+     * legitimately has zero subscribers. Those are governed by
+     * {@link #verifyGameSessionsExist()} (game-server health) instead.
+     */
     @Scheduled(fixedDelay = 60_000)
-    public synchronized void deleteEmptyRooms() {
+    public synchronized void deleteInactiveRooms() {
         long now = System.currentTimeMillis();
         List<String> deleted = new ArrayList<>();
-        roomStore.emptyRoomTimestamps.entrySet().removeIf(entry -> {
-            if (now - entry.getValue() >= EMPTY_ROOM_TTL_MS) {
-                roomStore.rooms.removeIf(r -> r.getId().equals(entry.getKey()) && r.getPlayerIds().isEmpty());
-                deleted.add(entry.getKey());
-                return true;
+        for (Room room : roomStore.rooms) {
+            boolean exempt = room.getStatus() == GameStatus.PLAYING
+                    || "Test Room".equals(room.getName())
+                    || sseRegistry.hasSubscribers(room.getId());
+            if (exempt) {
+                roomStore.inactiveSince.remove(room.getId());
+                continue;
             }
-            return false;
-        });
+            long since = roomStore.inactiveSince.computeIfAbsent(room.getId(), k -> now);
+            if (now - since >= EMPTY_ROOM_TTL_MS) {
+                deleted.add(room.getId());
+            }
+        }
         if (!deleted.isEmpty()) {
-            deleted.forEach(id -> sseRegistry.emitClosed(id));
+            deleted.forEach(id -> {
+                roomStore.deleteRoom(id);
+                sseRegistry.emitClosed(id);
+            });
             emitLobbyUpdate();
         }
     }

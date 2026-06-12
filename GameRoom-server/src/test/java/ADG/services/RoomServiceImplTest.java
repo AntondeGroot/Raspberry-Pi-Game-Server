@@ -273,72 +273,100 @@ class RoomServiceImplTest {
         assertNull(service.getRoomById("does-not-exist"));
     }
 
-    // ── deleteEmptyRooms ─────────────────────────────────────────────────────
+    // ── deleteInactiveRooms ──────────────────────────────────────────────────
+    // A room is "inactive" when it has no live SSE connection. Presence is the
+    // signal, not the player list — a room with phantom players (everyone closed
+    // their tab) but no subscribers must still be cleaned up.
 
     @Test
-    void emptyRoomIsDeletedAfterTtlExpires() throws RoomServiceException {
+    void roomWithNoSubscribersIsDeletedAfterTtlExpires() throws RoomServiceException {
         Room room = buildRoom("Alpha");
         service.createRoom(room);
         service.publishRoom(room.getId());
         service.addPlayerIdToRoom("player-1", room.getId());
-        service.removePlayerFromRoom("player-1", room.getId());
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(false);
 
-        // Manually backdate the empty timestamp to simulate 15+ minutes passing
-        roomStore.emptyRoomTimestamps.put(room.getId(), System.currentTimeMillis() - (16 * 60 * 1000L));
+        // Backdate the inactivity timestamp to simulate 15+ minutes with no connection
+        roomStore.inactiveSince.put(room.getId(), System.currentTimeMillis() - (16 * 60 * 1000L));
 
-        service.deleteEmptyRooms();
+        service.deleteInactiveRooms();
 
         assertNull(service.getRoomById(room.getId()));
     }
 
     @Test
-    void emptyRoomIsKeptIfTtlHasNotExpired() throws RoomServiceException {
+    void roomWithNoSubscribersIsKeptIfTtlHasNotExpired() throws RoomServiceException {
         Room room = buildRoom("Alpha");
         service.createRoom(room);
         service.publishRoom(room.getId());
         service.addPlayerIdToRoom("player-1", room.getId());
-        service.removePlayerFromRoom("player-1", room.getId());
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(false);
 
-        service.deleteEmptyRooms(); // called immediately — TTL not yet exceeded
+        service.deleteInactiveRooms(); // first sweep just starts the timer — TTL not yet exceeded
 
         assertNotNull(service.getRoomById(room.getId()));
+        assertTrue(roomStore.inactiveSince.containsKey(room.getId()));
     }
 
     @Test
-    void roomWithPlayersIsNotScheduledForDeletion() throws RoomServiceException {
+    void roomWithLiveSubscriberIsNotScheduledForDeletion() throws RoomServiceException {
         Room room = buildRoom("Alpha");
         service.createRoom(room);
         service.publishRoom(room.getId());
         service.addPlayerIdToRoom("player-1", room.getId());
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(true);
 
-        roomStore.emptyRoomTimestamps.put(room.getId(), System.currentTimeMillis() - (16 * 60 * 1000L));
-        service.deleteEmptyRooms();
+        // Even with a stale timestamp, a live connection keeps the room alive
+        roomStore.inactiveSince.put(room.getId(), System.currentTimeMillis() - (16 * 60 * 1000L));
+        service.deleteInactiveRooms();
 
         assertNotNull(service.getRoomById(room.getId()));
+        assertFalse(roomStore.inactiveSince.containsKey(room.getId()));
     }
 
     @Test
-    void joiningRoomCancelsEmptyTimer() throws RoomServiceException {
+    void reconnectingSubscriberCancelsInactivityTimer() throws RoomServiceException {
         Room room = buildRoom("Alpha");
         service.createRoom(room);
         service.publishRoom(room.getId());
-        service.addPlayerIdToRoom("player-1", room.getId());
-        service.removePlayerFromRoom("player-1", room.getId()); // room becomes empty → timer starts
-        service.addPlayerIdToRoom("player-2", room.getId());    // player joins → timer cancelled
 
-        // Timer must have been removed — no entry should exist for this room
-        assertFalse(roomStore.emptyRoomTimestamps.containsKey(room.getId()));
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(false);
+        service.deleteInactiveRooms();                 // no subscribers → timer starts
+        assertTrue(roomStore.inactiveSince.containsKey(room.getId()));
+
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(true);
+        service.deleteInactiveRooms();                 // a connection appears → timer cancelled
+
+        assertFalse(roomStore.inactiveSince.containsKey(room.getId()));
     }
 
     @Test
-    void pendingRoomIsNotScheduledForDeletion() throws RoomServiceException {
+    void playingRoomWithNoSubscribersIsNotDeleted() throws RoomServiceException {
+        // During play the client navigates away from the GameRoom page, so a
+        // PLAYING room legitimately has no SSE subscribers. It must be left to
+        // verifyGameSessionsExist, never deleted by the inactivity sweep.
         Room room = buildRoom("Alpha");
-        service.createRoom(room); // status is PENDING, no players
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        room.setStatus(GameStatus.PLAYING);
 
-        service.deleteEmptyRooms();
+        roomStore.inactiveSince.put(room.getId(), System.currentTimeMillis() - (16 * 60 * 1000L));
+        service.deleteInactiveRooms();
 
         assertNotNull(service.getRoomById(room.getId()));
-        assertTrue(roomStore.emptyRoomTimestamps.isEmpty());
+        verify(sseRegistry, never()).hasSubscribers(room.getId());
+    }
+
+    @Test
+    void testRoomIsNeverDeletedByInactivitySweep() throws RoomServiceException {
+        Room room = buildRoom("Test Room");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+
+        roomStore.inactiveSince.put(room.getId(), System.currentTimeMillis() - (16 * 60 * 1000L));
+        service.deleteInactiveRooms();
+
+        assertNotNull(service.getRoomById(room.getId()));
     }
 
     // ── deleteRoom ───────────────────────────────────────────────────────────

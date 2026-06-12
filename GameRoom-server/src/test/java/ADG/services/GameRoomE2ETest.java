@@ -60,7 +60,7 @@ class GameRoomE2ETest {
     void tearDown() {
         if (driver != null) driver.quit();
         roomStore.rooms.removeIf(r -> !"Test Room".equals(r.getName()));
-        roomStore.emptyRoomTimestamps.clear();
+        roomStore.inactiveSince.clear();
     }
 
     // ── LOBBY VISIBILITY ─────────────────────────────────────────────────────

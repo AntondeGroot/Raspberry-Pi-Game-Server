@@ -31,7 +31,7 @@ class AdminControllerTest {
     @BeforeEach
     void clearRooms() {
         roomStore.rooms.clear();
-        roomStore.emptyRoomTimestamps.clear();
+        roomStore.inactiveSince.clear();
     }
 
     // ── GET /admin/check ─────────────────────────────────────────────────────

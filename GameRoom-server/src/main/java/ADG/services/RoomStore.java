@@ -14,13 +14,16 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class RoomStore {
 
     final CopyOnWriteArrayList<Room> rooms = new CopyOnWriteArrayList<>();
-    final ConcurrentHashMap<String, Long> emptyRoomTimestamps = new ConcurrentHashMap<>();
+    // Timestamp (ms) at which a non-PLAYING room was first observed with no live
+    // SSE connections. Used to delete rooms that have been abandoned (e.g. all
+    // players closed their tab) after a TTL, even if phantom players linger.
+    final ConcurrentHashMap<String, Long> inactiveSince = new ConcurrentHashMap<>();
     final ConcurrentHashMap<String, String> gameStateVersions = new ConcurrentHashMap<>();
     final ConcurrentHashMap<String, Long> gameStateVersionTimestamps = new ConcurrentHashMap<>();
 
     public void deleteRoom(String roomId) {
         rooms.removeIf(r -> roomId.equals(r.getId()));
-        emptyRoomTimestamps.remove(roomId);
+        inactiveSince.remove(roomId);
         gameStateVersions.remove(roomId);
         gameStateVersionTimestamps.remove(roomId);
     }

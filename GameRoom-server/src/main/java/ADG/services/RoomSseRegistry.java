@@ -28,6 +28,16 @@ public class RoomSseRegistry {
         return emitter;
     }
 
+    /**
+     * Whether the given room currently has at least one live SSE connection.
+     * The 30s heartbeat prunes dead emitters, so an empty (or absent) list means
+     * nobody is connected to this room right now.
+     */
+    public boolean hasSubscribers(String roomId) {
+        List<SseEmitter> emitters = rooms.get(roomId);
+        return emitters != null && !emitters.isEmpty();
+    }
+
     public void emit(String roomId, Room room) {
         List<SseEmitter> emitters = rooms.get(roomId);
         if (emitters == null) return;
