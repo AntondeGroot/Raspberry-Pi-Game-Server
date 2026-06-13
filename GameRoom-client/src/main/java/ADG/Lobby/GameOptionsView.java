@@ -104,13 +104,12 @@ public class GameOptionsView extends Composite {
             optionsParam = "&options=" + URL.encodeQueryString(json.toString());
         }
 
-        String adminParam = isAdmin ? "&admin=1" : "";
-        String url = baseUrl + "/settings?embed=1&lang=" + URL.encodeQueryString(lang) + adminParam + optionsParam;
+        String url = baseUrl + "/settings?embed=1&lang=" + URL.encodeQueryString(lang) + optionsParam;
         GWT.log("Embedding game settings frame: " + url);
         gameSettingsFrame.setUrl(url);
         gameSettingsFrame.setVisible(true);
 
-        setupMessageListener();
+        setupMessageListener(isAdmin);
     }
 
     /** Called from JSNI when the iframe posts a 'qwixx-options-changed' message. */
@@ -277,8 +276,10 @@ public class GameOptionsView extends Composite {
 
     // ── postMessage bridge ────────────────────────────────────────────────────
 
-    private native void setupMessageListener() /*-{
+    private native void setupMessageListener(boolean isAdmin) /*-{
         var self = this;
+        var frame = this.@ADG.Lobby.GameOptionsView::gameSettingsFrame;
+        var frameEl = frame.@com.google.gwt.user.client.ui.UIObject::getElement()();
         var handler = function(event) {
             if (event.data && event.data.type === 'qwixx-options-changed'
                     && event.data.options) {
@@ -288,6 +289,9 @@ public class GameOptionsView extends Composite {
         };
         $wnd._gameOptionsMessageHandler = handler;
         $wnd.addEventListener('message', handler);
+        frameEl.addEventListener('load', function() {
+            frameEl.contentWindow.postMessage({ type: 'qwixx-admin-status', isAdmin: isAdmin }, '*');
+        });
     }-*/;
 
     public native void tearDownMessageListener() /*-{
