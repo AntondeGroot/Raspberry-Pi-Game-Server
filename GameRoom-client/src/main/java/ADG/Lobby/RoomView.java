@@ -39,6 +39,9 @@ public class RoomView extends Composite {
     Button startGameButton;
 
     @UiField
+    Button rejoinGameButton;
+
+    @UiField
     HTMLPanel langSelectorRow;
 
     @UiField
@@ -86,6 +89,7 @@ public class RoomView extends Composite {
     public RoomView() {
         initWidget(uiBinder.createAndBindUi(this));
         startGameButton.setText(I18n.c().startGame());
+        rejoinGameButton.setText(I18n.c().rejoinGame());
         leaveRoomButton.setText(I18n.c().leaveRoom());
         deleteRoomButton.setText(I18n.c().deleteRoom());
         sendMessageButton.setText(I18n.c().send());
@@ -101,6 +105,31 @@ public class RoomView extends Composite {
     public Button getLeaveRoomButton() { return leaveRoomButton; }
     public Button getDeleteRoomButton() { return deleteRoomButton; }
     public Button getStartGameButton() { return startGameButton; }
+    public Button getRejoinGameButton() { return rejoinGameButton; }
+
+    /**
+     * Switches the room between its normal "waiting room" layout and the
+     * "game in progress" layout. While a game is running the waiting-room
+     * controls (start / config / leave) make no sense, so we hide them and
+     * surface a single "Rejoin game" action plus a status label. When the
+     * game is not running the rejoin button is hidden and the leave button and
+     * game-config panel are restored; the per-player start/delete controls are
+     * then set by {@link #updateCreatorControls(Room)}.
+     */
+    public void showGameInProgress(boolean playing) {
+        rejoinGameButton.setVisible(playing);
+        gameConfigPanel.setVisible(!playing);
+        if (playing) {
+            startGameButton.setVisible(false);
+            deleteRoomButton.setVisible(false);
+            leaveRoomButton.setVisible(false);
+            startInfoLabel.setText(I18n.c().gameInProgress());
+            startInfoLabel.setStyleName("startInfoLabel startInfoLabel-waiting");
+            startInfoLabel.setVisible(true);
+        } else {
+            leaveRoomButton.setVisible(true);
+        }
+    }
     public HTMLPanel getPlayerPanel() { return playerPanel; }
     public TextArea getMessageDisplayField() { return messageDisplayField; }
     public TextBox getMessageInputField() { return messageInputField; }
