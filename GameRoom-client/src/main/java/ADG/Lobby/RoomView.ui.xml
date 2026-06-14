@@ -24,6 +24,7 @@
             <g:VerticalPanel styleName="bottom-aligned">
                 <g:HorizontalPanel styleName="startRowPanel">
                     <g:Button ui:field="startGameButton" text="Start Game" visible="false" stylePrimaryName="confirmButton"/>
+                    <g:Button ui:field="rejoinGameButton" text="Rejoin Game" visible="false" stylePrimaryName="confirmButton"/>
                     <g:Button ui:field="leaveRoomButton" text="Leave Room" stylePrimaryName="cancelButton"/>
                     <g:Button ui:field="deleteRoomButton" text="Delete Room" visible="false" stylePrimaryName="deleteButton"/>
                     <g:Label ui:field="startInfoLabel" styleName="startInfoLabel"/></g:HorizontalPanel>

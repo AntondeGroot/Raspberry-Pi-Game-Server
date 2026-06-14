@@ -28,6 +28,8 @@ public interface AppConstants extends Constants {
 
     // Room view
     String startGame();
+    String rejoinGame();
+    String gameInProgress();
     String leaveRoom();
     String deleteRoom();
     String send();

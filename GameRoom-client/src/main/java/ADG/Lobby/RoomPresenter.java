@@ -37,6 +37,8 @@ public class RoomPresenter implements Presenter {
     private boolean isAdmin = false;
     private String knownGameId = null;
     private GameStatus lastKnownStatus = null;
+    private boolean redirectedToGame = false;
+    private String pendingGameUrl = null;
     private ArrayList<GameDefinition> availableGames = new ArrayList<>();
     private ArrayList<GameOption> gameOptionDefs = new ArrayList<>();
     private HashMap<String, String> knownGameOptions = new HashMap<>();
@@ -87,6 +89,7 @@ public class RoomPresenter implements Presenter {
         roomView.refreshPlayerList(new HashMap<>(), new HashMap<>());
         roomView.refreshMessages(new ArrayList<>());
         handlerRegistrations.add(roomView.getLeaveRoomButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); leaveRoom(); }));
+        handlerRegistrations.add(roomView.getRejoinGameButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); enterGame(); }));
         handlerRegistrations.add(roomView.getDeleteRoomButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); deleteRoom(); }));
         handlerRegistrations.add(roomView.getStartGameButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); startGame(); }));
         handlerRegistrations.add(roomView.getSendMessageButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); sendMessage(); }));
@@ -95,7 +98,15 @@ public class RoomPresenter implements Presenter {
                 sendMessage();
             }
         }));
-        roomView.updateCreatorControls(room);
+        // Render the initial layout from the snapshot; the first SSE frame will
+        // refine it. If we're entering a room whose game is already running, show
+        // the game-in-progress layout straight away instead of the (now misleading)
+        // creator controls.
+        if (room.getStatus() == GameStatus.PLAYING) {
+            roomView.showGameInProgress(true);
+        } else {
+            roomView.updateCreatorControls(room);
+        }
         handlerRegistrations.add(roomView.getGameSelectorBox().addChangeHandler(event -> onGameSelectorChanged()));
         handlerRegistrations.add(roomView.getOptionsButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); onOptionsButtonClicked(); }));
         handlerRegistrations.add(roomView.getAnyPlayerCanSelectGameCheckbox().addValueChangeHandler(event -> onPermissionChanged()));
@@ -279,6 +290,16 @@ public class RoomPresenter implements Presenter {
         sendMessageToServer(I18n.c().hasLeftTheRoom());
     }
 
+    /** Navigates to the currently running game. Used both for the one-time
+     *  auto-enter when the game starts and for the "Rejoin game" button. */
+    private void enterGame() {
+        if (pendingGameUrl == null) return;
+        redirectedToGame = true;
+        GWT.log("Navigating to game URL: " + pendingGameUrl);
+        stop();
+        Window.Location.replace(pendingGameUrl);
+    }
+
     private void deleteRoom() {
         boolean confirmDelete = Window.confirm(I18n.c().confirmDeleteRoom());
         if (!confirmDelete) return;
@@ -355,27 +376,36 @@ public class RoomPresenter implements Presenter {
 
         Room updatedRoom = parseRoom(obj);
 
-        boolean gameJustStarted = lastKnownStatus != null
+        boolean nowPlaying = updatedRoom.getStatus() == GameStatus.PLAYING;
+        boolean justStarted = lastKnownStatus != null
                 && lastKnownStatus != GameStatus.PLAYING
-                && updatedRoom.getStatus() == GameStatus.PLAYING;
+                && nowPlaying;
         lastKnownStatus = updatedRoom.getStatus();
 
-        if (gameJustStarted && updatedRoom.getGameSessionId() != null
-                && updatedRoom.getPlayerIds().contains(Cookie.getPlayerId())) {
-            stop();
-            String url = updatedRoom.getGameBaseUrl()
+        // While a game is running we keep the URL needed to enter it, so the
+        // "Rejoin game" button (and the auto-enter below) always have a target.
+        // This is independent of playerIds membership so a player who was dropped
+        // from the room mid-game (e.g. exited to lobby) can still rejoin.
+        if (nowPlaying && updatedRoom.getGameSessionId() != null) {
+            pendingGameUrl = updatedRoom.getGameBaseUrl()
                     + "/?sessionid=" + updatedRoom.getGameSessionId()
                     + "&playerid=" + Cookie.getPlayerId()
                     + "&locale=" + Cookie.getLanguage().name()
                     + "&roomid=" + updatedRoom.getId();
-            GWT.log("Navigating to game URL: " + url);
-            Window.Location.replace(url);
+        }
+
+        // Auto-enter only at the moment the game starts, and only for players who
+        // are sitting in the room and belong to it. Anyone who arrives or
+        // reconnects after the game already started is NOT auto-redirected — they
+        // get the "Rejoin game" button instead (handled by showGameInProgress).
+        if (justStarted && !redirectedToGame
+                && pendingGameUrl != null
+                && updatedRoom.getPlayerIds().contains(Cookie.getPlayerId())) {
+            enterGame();
             return;
         }
 
-        if (updatedRoom.getStatus() == GameStatus.PLAYING) {
-            roomView.getLeaveRoomButton().setVisible(false);
-        }
+        roomView.showGameInProgress(nowPlaying);
 
         HashMap<String, String> serverUserNames = updatedRoom.getPlayerNames();
         HashMap<String, String> serverUserProfiles = updatedRoom.getPlayerProfiles();
@@ -390,6 +420,14 @@ public class RoomPresenter implements Presenter {
         } else {
             playerListInitialized = true;
         }
+
+        // The waiting-room controls below (game selection, options, start/delete,
+        // creator label) are only meaningful before a game starts. Once the room is
+        // PLAYING, showGameInProgress() owns the layout, so stop here.
+        if (nowPlaying) {
+            return;
+        }
+
         // ── Game config ──────────────────────────────────────────────
         String newGameId = updatedRoom.getGameId();
         HashMap<String, String> newGameOptions = updatedRoom.getGameOptions() != null
