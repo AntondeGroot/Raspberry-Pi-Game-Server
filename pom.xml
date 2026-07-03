@@ -5,9 +5,9 @@
   <version>1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <properties>
-    <gwt.version>2.13.0</gwt.version>
+    <gwt.version>2.13.1</gwt.version>
     <snakeyaml.version>2.6</snakeyaml.version>
-    <spring-boot.version>3.5.15</spring-boot.version>
+    <spring-boot.version>3.5.16</spring-boot.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
   <dependencyManagement>
