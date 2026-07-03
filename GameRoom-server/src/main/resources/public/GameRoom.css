@@ -1669,3 +1669,11 @@ table.full-height {
   padding: 2px 10px;
   user-select: all; /* one click selects the whole password */
 }
+
+/* Parks preloaded sprite-sheet images off-screen so the browser keeps them
+   cached without them being visible or affecting layout. */
+.preload-offscreen {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+}

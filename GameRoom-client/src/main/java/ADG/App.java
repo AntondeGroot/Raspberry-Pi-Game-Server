@@ -6,9 +6,7 @@ import ADG.Lobby.Room;
 import ADG.Lobby.SpriteSheets;
 import ADG.Utils.Cookie;
 import com.google.gwt.core.client.EntryPoint;
-import com.google.gwt.user.client.Window;
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.dom.client.Style;
 import com.google.gwt.http.client.Request;
 import com.google.gwt.http.client.RequestBuilder;
 import com.google.gwt.http.client.RequestCallback;
@@ -89,9 +87,7 @@ public class App implements EntryPoint {
 	private void preloadSpriteSheetImages() {
 		for (SpriteSheets.Sheet sheet : SpriteSheets.all()) {
 			Image img = new Image(sheet.url);
-			img.getElement().getStyle().setPosition(Style.Position.ABSOLUTE);
-			img.getElement().getStyle().setLeft(-9999, Style.Unit.PX);
-			img.getElement().getStyle().setTop(-9999, Style.Unit.PX);
+			img.addStyleName("preload-offscreen");
 			RootPanel.get().add(img);
 		}
 	}
