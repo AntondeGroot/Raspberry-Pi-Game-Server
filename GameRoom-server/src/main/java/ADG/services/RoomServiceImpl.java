@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +47,9 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
 
     @Autowired
     private GamesConfig gamesConfig;
+
+    /** Localized game names fetched from each game ({baseUrl}/game-name), keyed "gameId|locale". */
+    private final Map<String, String> gameNameCache = new ConcurrentHashMap<>();
 
     @Autowired
     private SpriteSheetsConfig spriteSheetsConfig;
@@ -437,13 +441,69 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
 
     @Override
     public synchronized ArrayList<GameDefinition> getAvailableGames() {
+        String locale = getLocaleFromRequest();
         ArrayList<GameDefinition> reachable = new ArrayList<>();
         for (GameDefinition game : gamesConfig.getAvailable()) {
             if (isReachable(game.getHealthUrl())) {
-                reachable.add(game);
+                reachable.add(withLocalizedName(game, locale));
             }
         }
         return reachable;
+    }
+
+    /** The GameRoom UI language, from the "language" cookie (default English). */
+    String getLocaleFromRequest() {
+        if (getThreadLocalRequest() == null) return "en"; // e.g. called off a request thread
+        jakarta.servlet.http.Cookie[] cookies = getThreadLocalRequest().getCookies();
+        if (cookies != null) {
+            for (jakarta.servlet.http.Cookie c : cookies) {
+                if ("language".equals(c.getName()) && c.getValue() != null && !c.getValue().isBlank()) {
+                    return c.getValue().toLowerCase();
+                }
+            }
+        }
+        return "en";
+    }
+
+    /**
+     * A copy of {@code game} whose name is the localized name served by the game
+     * itself ({baseUrl}/game-name?locale=xx), so the game owns its name in every
+     * language (single source of truth). Cached per (game, locale); falls back to
+     * the configured name if the game doesn't provide one.
+     */
+    private GameDefinition withLocalizedName(GameDefinition game, String locale) {
+        String cacheKey = game.getId() + "|" + locale;
+        String name = gameNameCache.get(cacheKey);
+        if (name == null) {
+            name = fetchGameName(game.getBaseUrl(), locale);
+            if (name != null) {
+                gameNameCache.put(cacheKey, name); // only cache successful lookups
+            }
+        }
+        GameDefinition copy = new GameDefinition();
+        copy.setId(game.getId());
+        copy.setName(name != null ? name : game.getName());
+        copy.setBaseUrl(game.getBaseUrl());
+        copy.setHealthUrl(game.getHealthUrl());
+        copy.setMinPlayers(game.getMinPlayers());
+        copy.setMaxPlayers(game.getMaxPlayers());
+        copy.setEmbeddedSettings(game.isEmbeddedSettings());
+        return copy;
+    }
+
+    /** GETs {baseUrl}/game-name?locale=xx and returns the name, or null on any failure. */
+    private String fetchGameName(String baseUrl, String locale) {
+        try {
+            Map<?, ?> body = restTemplate.getForObject(
+                    baseUrl + "/game-name?locale=" + locale, Map.class);
+            if (body != null && body.get("name") != null) {
+                return body.get("name").toString();
+            }
+        } catch (Exception e) {
+            logger.warn("Could not fetch localized game name from {} (locale {}): {}",
+                    baseUrl, locale, e.getMessage());
+        }
+        return null;
     }
 
     /**
@@ -626,7 +686,7 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         return e.getMessage();
     }
 
-    private boolean isReachable(String baseUrl) {
+    boolean isReachable(String baseUrl) {
         try {
             HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl).openConnection();
             connection.setConnectTimeout(1500);
