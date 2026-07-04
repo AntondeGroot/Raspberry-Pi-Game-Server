@@ -1290,4 +1290,64 @@ class RoomServiceImplTest {
         assertEquals(true, sentOptions.get("base"),
                 "the 'base' default (true) must be forwarded to the game server");
     }
+
+    // ── getAvailableGames: localized game names (single source of truth = the game) ──
+
+    private GameDefinition gameDef(String id, String name, String baseUrl) {
+        GameDefinition g = new GameDefinition();
+        g.setId(id);
+        g.setName(name);
+        g.setBaseUrl(baseUrl);
+        g.setHealthUrl(baseUrl + "/health");
+        g.setMinPlayers(2);
+        g.setMaxPlayers(8);
+        return g;
+    }
+
+    @Test
+    void getAvailableGamesUsesLocalizedNameFromGame() {
+        GameDefinition keezen = gameDef("keezen", "Keezen", "http://game");
+        when(gamesConfig.getAvailable()).thenReturn(List.of(keezen));
+        doReturn("de").when(service).getLocaleFromRequest();
+        doReturn(true).when(service).isReachable("http://game/health");
+        when(restTemplate.getForObject("http://game/game-name?locale=de", Map.class))
+                .thenReturn(Map.of("name", "Dog"));
+
+        List<GameDefinition> games = service.getAvailableGames();
+
+        assertEquals(1, games.size());
+        assertEquals("Dog", games.get(0).getName(), "name comes from the game's /game-name");
+        assertEquals("keezen", games.get(0).getId(), "other fields are preserved");
+        assertEquals(8, games.get(0).getMaxPlayers());
+    }
+
+    @Test
+    void getAvailableGamesFallsBackToConfigNameWhenGameHasNoLocalizedName() {
+        GameDefinition keezen = gameDef("keezen", "Keezen", "http://game");
+        when(gamesConfig.getAvailable()).thenReturn(List.of(keezen));
+        doReturn("de").when(service).getLocaleFromRequest();
+        doReturn(true).when(service).isReachable("http://game/health");
+        when(restTemplate.getForObject("http://game/game-name?locale=de", Map.class))
+                .thenThrow(new ResourceAccessException("game down"));
+
+        List<GameDefinition> games = service.getAvailableGames();
+
+        assertEquals("Keezen", games.get(0).getName(), "falls back to the configured name");
+    }
+
+    @Test
+    void getAvailableGamesCachesLocalizedNamePerLocale() {
+        GameDefinition keezen = gameDef("keezen", "Keezen", "http://game");
+        when(gamesConfig.getAvailable()).thenReturn(List.of(keezen));
+        doReturn("de").when(service).getLocaleFromRequest();
+        doReturn(true).when(service).isReachable("http://game/health");
+        when(restTemplate.getForObject("http://game/game-name?locale=de", Map.class))
+                .thenReturn(Map.of("name", "Dog"));
+
+        service.getAvailableGames();
+        service.getAvailableGames();
+
+        verify(restTemplate, times(1))
+                .getForObject("http://game/game-name?locale=de", Map.class);
+    }
 }
