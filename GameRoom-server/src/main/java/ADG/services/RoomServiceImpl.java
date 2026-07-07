@@ -362,7 +362,13 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         GameDefinition game = gamesConfig.findById(gameId).orElse(null);
         if (game == null) return new ArrayList<>();
         try {
-            GameOption[] options = restTemplate.getForObject(game.getBaseUrl() + "/game-options", GameOption[].class);
+            // Fetch the options localized to the lobby language, the same way the game name is
+            // (see fetchGameName) — the game owns its option labels in every language. A game
+            // that ignores ?locale= just returns its default labels, so this stays compatible
+            // with every game (e.g. qwixx).
+            String locale = getLocaleFromRequest();
+            GameOption[] options = restTemplate.getForObject(
+                    game.getBaseUrl() + "/game-options?locale=" + locale, GameOption[].class);
             if (options == null) return new ArrayList<>();
             Authentication auth = SecurityContextHolder.getContext().getAuthentication();
             boolean isAdmin = auth != null && auth.getAuthorities().stream()
