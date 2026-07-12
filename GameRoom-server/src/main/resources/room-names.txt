@@ -24,10 +24,16 @@ Wolf-359
 Ten Forward
 The Q Continuum
 Transporter Room
+The Alpha Quadrant
+The Beta Quadrant
 The Delta Quadrant
+The Gamma Quadrant
 The Promenade
 Deep Space 9
 Quark's Bar
+The Captain's Ready room
+The Bridge
+Engineering
 
 # Dr Who
 #
@@ -48,6 +54,7 @@ Alderaan
 Ewok Drum Circle
 Tatooine
 Inside a Tauntaun
+Death Star Cafeteria
 
 # The Expanse
 #
@@ -64,11 +71,13 @@ Neo's Pod
 
 # Harry Potter
 The Chamber of Secrets
+The Room of Requirement
 Hagrid's Hut
 The Astronomy Tower
 Hogsmead
 The Leaky Cauldron
-Diagonalley
+Platform 9¾
+Diagon Alley
 Vault 687
 The Ministry of Magic
 
@@ -76,17 +85,35 @@ The Ministry of Magic
 The Shire
 Isengard
 Mordor
+The Prancing Pony
 
 # spongebob
 Weenie Hut Jr's
-The Salty Spitoon
+The Salty Spittoon
 Bikini Bottom
 The Crusty Crab
+Jellyfish Fields
+Mrs Puff's Boating School
+
+# Futurama
+Planet Express
+The Head Museum
+Omicron Persei 8
+MomCorp
+Fry's Cryotube
+
+# Pokémon
+Pallet Town
+Cerulean Gym
+Victory Road
+Lavender Town
+Prof. Oak's Lab
 
 # Other
 #
 Big Babylon
 Babylon 5
+Blood Gulch
 Observation Deck
 The Poop Deck
 The War Room
@@ -97,5 +124,11 @@ The Bad Place
 The Medium Place
 The Office
 The Annex
+Ministry of Silly Walks
+Definitely Not a Cult
+404 Room Not Found
+Your Parents' Basement
+The Broom Closet
+A Room Full of Tribbles
 Los Pollos Hermanos
 Valhalla
