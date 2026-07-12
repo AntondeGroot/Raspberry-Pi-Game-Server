@@ -23,11 +23,13 @@ public class LobbyPresenter implements Presenter {
     private final ArrayList<Room> rooms = new ArrayList<>();
     private final EventSourceWrapper lobbySse = new EventSourceWrapper();
     private String pendingRejoinRoomId = null;
+    private boolean initialLobbyLoadDone = false;
 
     @Override
     public void start() {
         History.newItem("");
         pendingRejoinRoomId = Window.Location.getParameter("rejoin");
+        view.showLoadingRooms();
         checkAdminStatus();
         loadAvailableGames();
         lobbySse.open("/lobby/stream", this::handleLobbySseMessage);
@@ -111,10 +113,16 @@ public class LobbyPresenter implements Presenter {
     private void handleLobbySseMessage(String data) {
         try {
             ArrayList<Room> fetchedRooms = parseRooms(data);
-            if (!rooms.equals(fetchedRooms)) {
+            boolean changed = !rooms.equals(fetchedRooms);
+            if (changed) {
                 updateRooms(fetchedRooms);
+            }
+            // Always render on the first message — even an unchanged/empty list must
+            // replace the loading skeleton with the real (possibly empty) table.
+            if (changed || !initialLobbyLoadDone) {
                 updateRoomTable();
             }
+            initialLobbyLoadDone = true;
             if (pendingRejoinRoomId != null) {
                 attemptAutoRejoin();
             }
@@ -289,7 +297,9 @@ public class LobbyPresenter implements Presenter {
                 public void onResponseReceived(Request request, Response response) {
                     if (response.getStatusCode() == Response.SC_OK) {
                         view.setAdminMode(true);
-                        updateRoomTable(); // re-render in case SSE already populated the table
+                        // Re-render only if rooms have loaded — otherwise the skeleton is
+                        // still showing and the SSE handler will render with admin mode on.
+                        if (initialLobbyLoadDone) updateRoomTable();
                     } else if (Cookie.hasAdminHint()) {
                         // Session expired but this browser has logged in before — show the shortcut
                         view.showAdminLoginHintButton();
