@@ -63,6 +63,8 @@ class MobileLobbyUxTest {
 
     @Test
     void roomTableDoesNotExceedViewportWidth() {
+        // Seed a normal room — the demo "Test Room" is now admin-only.
+        roomStore.rooms.add(buildWaitingRoom("Layout Room", UUID.randomUUID().toString()));
         openLobby();
         waitForTableRow();
 
@@ -113,6 +115,8 @@ class MobileLobbyUxTest {
 
     @Test
     void roomTableHeadersAreNotTruncated() {
+        // Seed a normal room — the demo "Test Room" is now admin-only.
+        roomStore.rooms.add(buildWaitingRoom("Layout Room", UUID.randomUUID().toString()));
         openLobby();
         waitForTableRow();
 

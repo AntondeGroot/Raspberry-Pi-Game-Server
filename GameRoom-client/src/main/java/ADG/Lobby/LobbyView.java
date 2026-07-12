@@ -18,6 +18,9 @@ public class LobbyView extends Composite {
     interface GameLobbyViewUiBinder extends UiBinder<Widget, LobbyView> {}
     private final static GameLobbyViewUiBinder uiBinder = GWT.create(GameLobbyViewUiBinder.class);
 
+    /** Seeded demo room — only shown to admins; hidden from regular players. */
+    private static final String TEST_ROOM_NAME = "Test Room";
+
     @UiField VerticalPanel mainPanel;
     @UiField FlowPanel langSelectorRow;
     @UiField FlowPanel createRoomPanel;
@@ -122,14 +125,74 @@ public class LobbyView extends Composite {
         Window.alert(msg);
     }
 
+    /**
+     * Shows shimmering placeholder rows while the first lobby fetch is in flight,
+     * so users never see the "No rooms yet" empty state before the data lands.
+     */
+    public void showLoadingRooms() {
+        clearRoomRows();
+        for (int i = 0; i < 3; i++) {
+            roomTableContainer.add(buildSkeletonRow());
+        }
+    }
+
     public void updateRoomTable(List<Room> rooms) {
-        // Keep header row (index 0), remove the rest
+        clearRoomRows();
+        // The seeded "Test Room" is a dev/demo fixture — hide it from regular players.
+        List<Room> visible = new ArrayList<>();
+        for (Room room : rooms) {
+            if (!adminMode && TEST_ROOM_NAME.equals(room.getName())) continue;
+            visible.add(room);
+        }
+        if (visible.isEmpty()) {
+            roomTableContainer.add(buildEmptyState());
+            return;
+        }
+        for (Room room : visible) {
+            roomTableContainer.add(buildRow(room));
+        }
+    }
+
+    /** Removes every widget after the header row (index 0). */
+    private void clearRoomRows() {
         while (roomTableContainer.getWidgetCount() > 1) {
             roomTableContainer.remove(1);
         }
-        for (Room room : rooms) {
-            roomTableContainer.add(buildRow(room));
-        }
+    }
+
+    private FlowPanel buildSkeletonRow() {
+        FlowPanel row = new FlowPanel();
+        row.setStyleName("skel-row");
+        row.add(makeSkelBar("skel skel-name"));
+        row.add(makeSkelBar("skel skel-cell"));
+        row.add(makeSkelBar("skel skel-cell"));
+        row.add(makeSkelBar("skel skel-btn"));
+        return row;
+    }
+
+    private SimplePanel makeSkelBar(String styleName) {
+        SimplePanel bar = new SimplePanel();
+        bar.setStyleName(styleName);
+        return bar;
+    }
+
+    private FlowPanel buildEmptyState() {
+        FlowPanel panel = new FlowPanel();
+        panel.setStyleName("room-empty-state");
+        panel.add(new HTML(
+            "<svg class=\"room-empty-icon\" viewBox=\"0 0 64 64\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">"
+          + "<rect x=\"6\" y=\"14\" width=\"52\" height=\"36\" rx=\"5\" stroke=\"#8b5cf6\" stroke-width=\"2\" stroke-dasharray=\"5 4\" opacity=\".75\"/>"
+          + "<path d=\"M6 25h52\" stroke=\"#fb923c\" stroke-width=\"2\" opacity=\".8\"/>"
+          + "<circle cx=\"24\" cy=\"38\" r=\"4\" fill=\"#fb923c\" opacity=\".55\"/>"
+          + "<circle cx=\"40\" cy=\"38\" r=\"4\" stroke=\"#8b5cf6\" stroke-width=\"2\" opacity=\".8\"/>"
+          + "</svg>"));
+        Label title = new Label(I18n.c().noRoomsTitle());
+        title.setStyleName("room-empty-title");
+        panel.add(title);
+        Label message = new Label(I18n.c().noRoomsMessage());
+        message.setStyleName("room-empty-message");
+        panel.add(message);
+        return panel;
     }
 
     private void buildTableHeader() {
@@ -146,6 +209,10 @@ public class LobbyView extends Composite {
     private FlowPanel buildRow(Room room) {
         FlowPanel row = new FlowPanel();
         row.setStyleName("room-table-row");
+        // Full rooms have no Join button; the mobile card view dims them so they read as inactive.
+        if (GameStatus.FULL.equals(room.getStatus())) {
+            row.addStyleName("room-row-full");
+        }
 
         // Name cell — admin gets a triangle toggle; everyone else gets a plain label
         if (adminMode) {

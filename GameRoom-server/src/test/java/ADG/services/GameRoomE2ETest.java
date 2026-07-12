@@ -66,9 +66,11 @@ class GameRoomE2ETest {
     // ── LOBBY VISIBILITY ─────────────────────────────────────────────────────
 
     @Test
-    void seededTestRoomAppearsInLobbyOnLoad() {
+    void seededTestRoomIsHiddenFromRegularPlayers() {
+        // The seeded "Test Room" is a dev/demo fixture — only admins should see it.
         openLobbyAs(UUID.randomUUID().toString());
-        assertEventuallyInLobby("Test Room");
+        pause(600);
+        assertNotInLobby("Test Room");
     }
 
     @Test

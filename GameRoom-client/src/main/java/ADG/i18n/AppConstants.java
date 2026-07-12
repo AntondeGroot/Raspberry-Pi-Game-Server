@@ -12,6 +12,8 @@ public interface AppConstants extends Constants {
     String createRoom();
     String randomName();
     String availableRooms();
+    String noRoomsTitle();
+    String noRoomsMessage();
 
     // Table headers
     String colRoomName();

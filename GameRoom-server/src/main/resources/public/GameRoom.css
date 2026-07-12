@@ -953,6 +953,81 @@ table.full-height {
 .status-full    { color: #f87171; }
 
 /* =============================================
+   Room list — loading skeleton & empty state
+   ============================================= */
+
+/* Skeleton rows: shown while the first lobby fetch is in flight so users never
+   see "No rooms yet" before the data has actually arrived. A distinct .skel-row
+   class (not .room-table-row) keeps them out of row-count logic and tests.     */
+.skel-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 15px 16px;
+  background-color: rgba(15, 8, 32, 0.85);
+  border-bottom: 1px solid rgba(139, 92, 246, 0.15);
+}
+.skel-row:nth-child(even) { background-color: rgba(139, 92, 246, 0.06); }
+.skel-row:last-child      { border-bottom: none; }
+
+.skel {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg,
+      rgba(139, 92, 246, 0.14) 25%,
+      rgba(139, 92, 246, 0.32) 50%,
+      rgba(139, 92, 246, 0.14) 75%);
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.4s linear infinite;
+}
+.skel-name { flex: 1 1 auto; max-width: 190px; }
+.skel-cell { flex: 0 0 auto; width: 52px; }
+.skel-btn  { flex: 0 0 auto; width: 70px; height: 28px; border-radius: 8px; margin-left: auto; }
+
+@keyframes skel-shimmer { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+
+/* Empty state: the fetch has completed and there genuinely are no rooms.
+   Deliberately has no "create" button — the Create-a-Room panel is already
+   up the page, so a second button here would be redundant.                    */
+.room-empty-state {
+  grid-column: 1 / -1;
+  background-color: rgba(15, 8, 32, 0.85);
+  padding: 40px 24px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.room-empty-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 8px;
+  opacity: 0.9;
+  animation: empty-floaty 4.5s ease-in-out infinite;
+}
+@keyframes empty-floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) { .room-empty-icon { animation: none; } }
+.room-empty-title {
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-size: 1.25em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+.room-empty-message {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+  line-height: 1.55;
+  max-width: 340px;
+  margin: 4px 0 0;
+}
+
+/* =============================================
    Admin — player inspector (triangle + dropdown)
    ============================================= */
 
@@ -1267,78 +1342,161 @@ table.full-height {
     margin-right: 12px;
   }
 
-  /* ── Room table ──
-     The container defines 5 subgrid tracks matching the desktop layout, but
-     with col-5 forced to 0 so the action column vanishes from the header.
-     Header and data rows both inherit these tracks via subgrid (same as
-     desktop) so every column aligns perfectly across all rows.
-     Each data row gets a second sub-row: the join/rejoin button sits there,
-     spanning cols 1–4 with its right edge flush with col-4's right edge.
-     The button overflows left as needed — it never widens any column.       */
+  /* ── Room list → cards ──
+     On phones the desktop grid table stops being a table and each row
+     reflows into a self-contained card:
+        ┌───────────────────────────────┐
+        │ Room Name            [ STATUS ]│   ← name leads, status pill top-right
+        │ Game                  3 / 4    │   ← quiet meta line
+        │ [        Join / Rejoin       ] │   ← full-width tap target
+        └───────────────────────────────┘
+     The container is a plain block (one card per row), the header row is
+     hidden (cards label their own fields by position), and each cell is
+     placed by explicit grid coordinates so admin's extra widgets (the
+     triangle name toggle and the player dropdown) slot in without
+     disturbing the layout.  Keeps the established purple palette and
+     radius/shadow tokens.                                                    */
   .room-table-container {
+    display: block;
     width: calc(100vw - 40px);
-    margin-left: 12px;
-    margin-right: 12px;
-    overflow-x: hidden;
-    /* col-5 = 0: action column exists in header subgrid but takes no space */
-    grid-template-columns: minmax(max-content, 1fr) max-content max-content max-content 0;
-    column-gap: 8px;
+    margin: 8px 12px 0;
+    overflow: visible;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+    grid-template-columns: none;
   }
 
-  /* Hide the empty 5th-column header cell (col track is already 0px) */
-  .room-table-header .room-cell-action,
-  .room-cell-button-header {
+  .room-table-header {
     display: none;
   }
 
-  /* Data rows: subgrid (inherited, same as desktop) + a second sub-row for
-     the action button. Empty action cells collapse to nothing.              */
+  /* Skeleton rows reflow into card-shaped placeholders to match the room cards. */
+  .skel-row {
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+    margin-bottom: 10px;
+    padding: 16px 14px;
+  }
+  .skel-row:last-child { margin-bottom: 0; }
+
+  /* Empty state → dashed card; the bare header over nothing would look broken. */
+  .room-empty-state {
+    border: 1px dashed rgba(139, 92, 246, 0.4);
+    border-radius: var(--radius-lg);
+    background-color: rgba(15, 8, 32, 0.6);
+    padding: 32px 18px;
+  }
+  .room-empty-message { font-size: 13px; }
+
   .room-table-row {
-    grid-template-columns: subgrid;
+    display: grid;
+    grid-template-columns: 1fr auto;
     grid-template-rows: auto auto auto;
+    align-items: center;
+    gap: 5px 10px;
+    padding: 13px 14px;
+    margin-bottom: 10px;
+    background-color: rgba(15, 8, 32, 0.85);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+    transition: border-color var(--transition), box-shadow var(--transition);
   }
 
-  .admin-player-dropdown {
+  /* Uniform cards — drop the desktop zebra striping and the hover
+     border-shift (which would jitter card width on a sticky touch hover). */
+  .room-table-row:nth-child(even) {
+    background-color: rgba(15, 8, 32, 0.85);
+  }
+  .room-table-row:hover {
+    background-color: rgba(15, 8, 32, 0.85);
+    border-left: 1px solid rgba(139, 92, 246, 0.25);
+  }
+  .room-table-row:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Full rooms carry no Join button — dim them so they read as inactive. */
+  .room-row-full {
+    opacity: 0.62;
+  }
+
+  .room-cell-name {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 0;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-text-primary);
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  /* Status → pill badge, top-right. Border inherits the status colour
+     (currentColor) set by .status-waiting / -playing / -full. */
+  .room-cell-status {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+    padding: 3px 10px;
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .room-cell-game {
+    grid-column: 1;
+    grid-row: 2;
+    padding: 0;
+    font-size: 13px;
+    font-style: italic;
+    color: var(--color-text-muted);
+  }
+
+  .room-cell-players {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: end;
+    padding: 0;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+  }
+
+  /* Join/Rejoin — its own full-width row; collapses when there's no action
+     (full / in-progress rooms the player isn't part of). Admin's extra
+     delete (✕) button sits compact to the right of a flex:1 Join.          */
+  .room-table-row .room-cell-action {
+    grid-column: 1 / -1;
     grid-row: 3;
-    padding: 6px 8px 8px;
+    display: flex;
+    gap: 8px;
+    padding: 0;
+    margin-top: 6px;
   }
-
   .room-table-row .room-cell-action:empty {
     display: none;
   }
 
-  /* Action cell: sub-row 2, placed in col-4 (same track as the status cell).
-     Sharing the same column track as the status cell means Chrome derives
-     both right edges from the same grid-track measurement, so there is no
-     floating-point accumulation that would make the action cell overrun the
-     status cell right edge by a sub-pixel.  justify-self: end keeps the cell
-     compact; the button may extend left into earlier columns (row 2, no
-     conflict) but its right edge is guaranteed flush with col-4.            */
-  .room-table-row .room-cell-action {
-    grid-column: 4 / 5;
-    grid-row: 2;
-    justify-self: end;
-    align-self: start;
-    padding: 2px 6px 4px;
-  }
-
-  .room-table-cell,
-  .room-table-header-cell {
-    font-size: 13px;
-    padding: 8px 6px;
-    letter-spacing: 0;
-  }
-
-  /* On mobile, switch header cells to the same font family as data cells.
-     Rajdhani bold renders wider than Nunito for the same text, causing the
-     header to overflow max-content column tracks that are sized by data cells. */
-  .room-table-header-cell {
-    font-family: 'Nunito', system-ui, sans-serif;
-  }
-
   .joinRoomButton {
-    font-size: 12px;
-    padding: 4px 10px;
+    flex: 1;
+    width: auto;
+    padding: 11px;
+    font-size: 14px;
+  }
+
+  /* Admin player inspector spans the full card, below the action row. */
+  .admin-player-dropdown {
+    grid-column: 1 / -1;
+    grid-row: 4;
+    padding: 8px 4px 4px;
   }
 
   /* ── Character Selection ─────────────────────────────────────────────────── */
