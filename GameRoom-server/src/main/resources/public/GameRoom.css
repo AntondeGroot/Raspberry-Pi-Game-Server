@@ -319,11 +319,49 @@ td, th, span, p, div, label {
   padding: 8px 0;
 }
 
-.game-options-checkbox input[type="checkbox"] {
-  accent-color: var(--color-primary);
-  width: 16px;
-  height: 16px;
+/* Bespoke round checkboxes — shared by the game-options card and the room
+   permissions panel. Circular well with a purple-glow gradient fill + light
+   check when on; a subtle orange ring on hover ties in the accent colour. */
+.game-options-checkbox input[type="checkbox"],
+.room-permissions-panel input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(139, 92, 246, 0.5);
+  background-color: rgba(0, 0, 0, 0.35);
+  background-repeat: no-repeat;
+  background-position: center;
   cursor: pointer;
+  transition: border-color var(--transition), background-color var(--transition), box-shadow var(--transition);
+}
+
+.game-options-checkbox input[type="checkbox"]:hover,
+.room-permissions-panel input[type="checkbox"]:hover {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 4px rgba(251, 146, 60, 0.10);
+}
+
+.game-options-checkbox input[type="checkbox"]:checked,
+.room-permissions-panel input[type="checkbox"]:checked {
+  border-color: var(--color-primary-hover);
+  background-color: transparent;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f5f3ff' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E"),
+    linear-gradient(145deg, #a78bfa 0%, #7c3aed 100%);
+  background-size: 12px 12px, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4);
+}
+
+.game-options-checkbox input[type="checkbox"]:focus-visible,
+.room-permissions-panel input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
 
 .game-options-field-inline {
@@ -1813,15 +1851,37 @@ table.full-height {
   max-width: 280px;   /* prevents absurd width on desktop; flex:1 still fills narrow mobile containers */
   appearance: none;
   -webkit-appearance: none;
-  background: rgba(0, 0, 0, 0.3);
+  color-scheme: dark;
+  background-color: rgba(0, 0, 0, 0.3);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239485c0' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
   border: 1px solid rgba(139, 92, 246, 0.4);
   border-radius: var(--radius-md);
   color: var(--color-text-primary);
   font-family: 'Nunito', sans-serif;
   font-size: var(--font-size-md);
-  padding: 6px 10px;
+  padding: 6px 32px 6px 10px;   /* room for the caret */
   cursor: pointer;
   outline: none;
+}
+
+/* Muted, italic while the "- Select a game -" placeholder is the current value,
+   so an unconfigured room reads as "nothing chosen yet" rather than a real game. */
+.room-game-select:has(option[value=""]:checked) {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.room-game-select option {
+  background: #1a0f2e;
+  color: var(--color-text-primary);
+  font-style: normal;
+}
+
+.room-game-select option[value=""] {
+  color: var(--color-text-muted);
+  font-style: italic;
 }
 
 .room-game-select:disabled {
@@ -1879,6 +1939,21 @@ table.full-height {
   font-size: 13px;
   color: rgba(148, 133, 192, 0.8);
   margin-top: 4px;
+}
+
+/* Each GWT CheckBox renders as span > input + label; lay the round box and its
+   label out on one line with comfortable spacing. */
+.room-permissions-panel .gwt-CheckBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 5px 0;
+  line-height: 1.4;
+}
+
+.room-permissions-panel .gwt-CheckBox label {
+  cursor: pointer;
 }
 
 /* Password badge: visible to all room members when a password is active */
