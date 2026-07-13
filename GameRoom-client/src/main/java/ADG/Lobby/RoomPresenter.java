@@ -7,6 +7,7 @@ import ADG.Utils.ChatCipher;
 import ADG.Utils.ConfirmDialog;
 import ADG.Utils.Cookie;
 import ADG.Utils.Notify;
+import ADG.Utils.RoomPasswordStore;
 import ADG.Utils.EventSourceWrapper;
 import ADG.Utils.GameTranslations;
 import ADG.Utils.TimeUtils;
@@ -114,6 +115,14 @@ public class RoomPresenter implements Presenter {
         handlerRegistrations.add(roomView.getAnyPlayerCanSelectGameCheckbox().addValueChangeHandler(event -> onPermissionChanged()));
         handlerRegistrations.add(roomView.getAnyPlayerCanSetOptionsCheckbox().addValueChangeHandler(event -> onPermissionChanged()));
         handlerRegistrations.add(roomView.getPasswordRequiredCheckbox().addValueChangeHandler(event -> onPasswordRequiredChanged()));
+        handlerRegistrations.add(roomView.getRegeneratePasswordButton().addClickHandler(event -> regenerateRoomPassword()));
+        handlerRegistrations.add(roomView.getPasswordEditInput().addKeyDownHandler(event -> {
+            if (event.getNativeKeyCode() == KeyCodes.KEY_ENTER) {
+                event.preventDefault();
+                commitCustomPassword();
+            }
+        }));
+        handlerRegistrations.add(roomView.getPasswordEditInput().addBlurHandler(event -> commitCustomPassword()));
     }
 
     private void startGame() {
@@ -215,6 +224,36 @@ public class RoomPresenter implements Presenter {
                 roomView.getPasswordRequiredCheckbox().setValue(knownPasswordRequired, false);
             }
             @Override public void onSuccess(Void v) {}
+        });
+    }
+
+    /** Asks the server for a fresh random password (CVC + 2 digits). */
+    private void regenerateRoomPassword() {
+        roomService.setRoomPassword(room.getId(), true, new AsyncCallback<Void>() {
+            @Override public void onFailure(Throwable t) {
+                GWT.log("Failed to regenerate room password: " + t.getMessage());
+            }
+            @Override public void onSuccess(Void v) {}
+        });
+    }
+
+    /** Saves a creator-edited custom password (no-op if empty or unchanged). */
+    private void commitCustomPassword() {
+        String current = room.getRoomPassword();
+        String entered = roomView.getPasswordEditInput().getValue().trim();
+        if (entered.isEmpty()) {
+            roomView.getPasswordEditInput().setValue(current == null ? "" : current);
+            return;
+        }
+        if (current != null && entered.equalsIgnoreCase(current)) {
+            return; // unchanged
+        }
+        roomService.updateRoomPassword(room.getId(), entered, new AsyncCallback<Void>() {
+            @Override public void onFailure(Throwable t) {
+                Notify.error(I18n.c().errPasswordUpdateFailed());
+                roomView.getPasswordEditInput().setValue(current == null ? "" : current);
+            }
+            @Override public void onSuccess(Void v) {} // SSE echoes the new value → display + caches update
         });
     }
 
@@ -464,7 +503,18 @@ public class RoomPresenter implements Presenter {
         room.setRoomPassword(updatedRoom.getRoomPassword());
         room.setEmbeddedSettings(updatedRoom.isEmbeddedSettings());
         knownPasswordRequired = updatedRoom.hasPassword();
-        roomView.updatePasswordDisplay(updatedRoom.getRoomPassword());
+
+        boolean isCreator = updatedRoom.getCreatedByUserId() != null
+                && updatedRoom.getCreatedByUserId().equals(Cookie.getPlayerId());
+        roomView.updatePasswordDisplay(updatedRoom.getRoomPassword(), isCreator);
+
+        // Keep every member's cached password in sync so a removed player can
+        // re-enter (auto-filled) even after the host changes it.
+        if (updatedRoom.hasPassword()) {
+            RoomPasswordStore.put(room.getId(), updatedRoom.getRoomPassword());
+        } else {
+            RoomPasswordStore.remove(room.getId());
+        }
 
         updateGameConfigControls(updatedRoom);
         roomView.updateCreatorControls(updatedRoom);

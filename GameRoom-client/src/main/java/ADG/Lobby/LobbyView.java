@@ -68,6 +68,10 @@ public class LobbyView extends Composite {
         lobbyTitle.setHTML("<h1>" + I18n.c().gameLobby() + "</h1>");
         createRoomTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().createARoom() + "</h2>");
         roomNameLabel.setText(I18n.c().roomName());
+        // Stop the browser autofilling saved credentials (e.g. an admin username) here.
+        roomNameInput.getElement().setAttribute("autocomplete", "off");
+        roomNameInput.getElement().setAttribute("data-lpignore", "true");
+        roomNameInput.getElement().setAttribute("data-1p-ignore", "true");
         createRoomButton.setText(I18n.c().createRoom());
         randomNameButton.setText("🎲 " + I18n.c().randomName());
         availableRoomsHeader.setText(I18n.c().availableRooms());

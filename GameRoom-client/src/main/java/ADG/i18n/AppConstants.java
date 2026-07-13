@@ -45,6 +45,9 @@ public interface AppConstants extends Constants {
     String requirePassword();
     String enterPasswordPrompt();
     String wrongPassword();
+    String regeneratePassword();
+    String editPasswordHint();
+    String errPasswordUpdateFailed();
 
     // Character selection
     String characterSelection();

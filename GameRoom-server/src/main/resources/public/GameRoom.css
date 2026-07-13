@@ -2271,6 +2271,60 @@ table.full-height {
   user-select: all; /* one click selects the whole password */
 }
 
+/* Creator's editable password row (shown instead of the read-only badge) */
+.room-password-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.room-password-edit-icon {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.room-password-input {
+  width: 120px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #ede8ff;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  border-radius: 6px;
+  padding: 3px 10px;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.room-password-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+
+.room-password-regen {
+  flex-shrink: 0;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.45);
+  border-radius: 6px;
+  color: #c4b5fd;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), transform var(--transition);
+}
+
+.room-password-regen:hover {
+  background: rgba(139, 92, 246, 0.28);
+  border-color: rgba(139, 92, 246, 0.7);
+}
+
+.room-password-regen:active { transform: scale(0.92); }
+
 /* Parks preloaded sprite-sheet images off-screen so the browser keeps them
    cached without them being visible or affecting layout. */
 .preload-offscreen {
