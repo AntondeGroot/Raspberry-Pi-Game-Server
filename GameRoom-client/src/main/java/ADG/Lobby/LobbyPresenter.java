@@ -1,8 +1,10 @@
 package ADG.Lobby;
 
 import ADG.*;
+import ADG.Utils.ConfirmDialog;
 import ADG.Utils.Cookie;
 import ADG.Utils.EventSourceWrapper;
+import ADG.Utils.PasswordPromptDialog;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
@@ -74,13 +76,10 @@ public class LobbyPresenter implements Presenter {
             if (GameStatus.PLAYING.equals(room.getStatus())) {
                 presenterManager.switchToGameRoom(room);
             } else if (room.hasPassword()) {
-                String entered = Window.prompt(I18n.c().enterPasswordPrompt(), "");
-                if (entered == null) return; // cancelled
-                if (!entered.equalsIgnoreCase(room.getRoomPassword())) {
-                    AudioPlayer.errorAlert(I18n.c().wrongPassword());
-                    return;
-                }
-                navigateToCharacterSelection(room);
+                new PasswordPromptDialog().show(
+                        room.getName(),
+                        entered -> entered.equalsIgnoreCase(room.getRoomPassword()),
+                        () -> navigateToCharacterSelection(room));
             } else {
                 navigateToCharacterSelection(room);
             }
@@ -265,22 +264,25 @@ public class LobbyPresenter implements Presenter {
         Room currentRoom = rooms.stream()
                 .filter(r -> r.getPlayerIds().contains(playerId))
                 .findFirst().orElse(null);
+        Runnable proceed = () -> {
+            Room room = new Room(roomName, playerId);
+            view.getRoomNameInput().setText("");
+            roomService.createRoom(room, new AsyncCallback<Room>() {
+                @Override
+                public void onFailure(Throwable t) {
+                    view.showAlert(I18n.m().errCouldNotCreateRoom(t.getMessage()));
+                }
+                @Override
+                public void onSuccess(Room created) {
+                    navigateToCharacterSelection(created);
+                }
+            });
+        };
         if (currentRoom != null) {
-            boolean confirmed = Window.confirm(I18n.m().confirmLeaveRoom(currentRoom.getName()));
-            if (!confirmed) return;
+            ConfirmDialog.show(I18n.m().confirmLeaveRoom(currentRoom.getName()), proceed);
+        } else {
+            proceed.run();
         }
-        Room room = new Room(roomName, playerId);
-        view.getRoomNameInput().setText("");
-        roomService.createRoom(room, new AsyncCallback<Room>() {
-            @Override
-            public void onFailure(Throwable t) {
-                view.showAlert(I18n.m().errCouldNotCreateRoom(t.getMessage()));
-            }
-            @Override
-            public void onSuccess(Room created) {
-                navigateToCharacterSelection(created);
-            }
-        });
     }
 
     private synchronized void updateRooms(ArrayList<Room> fetchedRooms) {
@@ -316,51 +318,53 @@ public class LobbyPresenter implements Presenter {
     }
 
     private void removePlayerAsAdmin(Room room, String playerId, String playerName) {
-        if (!Window.confirm(I18n.m().confirmRemovePlayer(playerName))) return;
-        RequestBuilder rb = new RequestBuilder(RequestBuilder.DELETE,
-                "/admin/rooms/" + room.getId() + "/players/" + playerId);
-        rb.setHeader("Accept", "application/json");
-        try {
-            rb.sendRequest(null, new RequestCallback() {
-                @Override
-                public void onResponseReceived(Request request, Response response) {
-                    if (response.getStatusCode() != Response.SC_NO_CONTENT) {
-                        view.showAlert(I18n.m().errDeleteFailed(response.getStatusText()));
+        ConfirmDialog.danger(I18n.m().confirmRemovePlayer(playerName), I18n.c().confirm(), () -> {
+            RequestBuilder rb = new RequestBuilder(RequestBuilder.DELETE,
+                    "/admin/rooms/" + room.getId() + "/players/" + playerId);
+            rb.setHeader("Accept", "application/json");
+            try {
+                rb.sendRequest(null, new RequestCallback() {
+                    @Override
+                    public void onResponseReceived(Request request, Response response) {
+                        if (response.getStatusCode() != Response.SC_NO_CONTENT) {
+                            view.showAlert(I18n.m().errDeleteFailed(response.getStatusText()));
+                        }
                     }
-                }
-                @Override
-                public void onError(Request request, Throwable exception) {
-                    view.showAlert(I18n.m().errDeleteFailed(exception.getMessage()));
-                }
-            });
-        } catch (RequestException e) {
-            GWT.log("Remove player failed: " + e.getMessage());
-        }
+                    @Override
+                    public void onError(Request request, Throwable exception) {
+                        view.showAlert(I18n.m().errDeleteFailed(exception.getMessage()));
+                    }
+                });
+            } catch (RequestException e) {
+                GWT.log("Remove player failed: " + e.getMessage());
+            }
+        });
     }
 
     private void deleteRoomAsAdmin(Room room) {
-        if (!Window.confirm(I18n.m().confirmDeleteRoomNamed(room.getName()))) return;
-        RequestBuilder rb = new RequestBuilder(RequestBuilder.DELETE, "/admin/rooms/" + room.getId());
-        rb.setHeader("Accept", "application/json");
-        try {
-            rb.sendRequest(null, new RequestCallback() {
-                @Override
-                public void onResponseReceived(Request request, Response response) {
-                    // 204 No Content: success — the lobby SSE stream will push the updated list.
-                    if (response.getStatusCode() == Response.SC_UNAUTHORIZED
-                            || response.getStatusCode() == Response.SC_FORBIDDEN) {
-                        view.showAlert(I18n.c().errNotAuthorised());
-                    } else if (response.getStatusCode() != Response.SC_NO_CONTENT) {
-                        view.showAlert(I18n.m().errDeleteFailedHttp(response.getStatusCode()));
+        ConfirmDialog.danger(I18n.m().confirmDeleteRoomNamed(room.getName()), I18n.c().deleteRoom(), () -> {
+            RequestBuilder rb = new RequestBuilder(RequestBuilder.DELETE, "/admin/rooms/" + room.getId());
+            rb.setHeader("Accept", "application/json");
+            try {
+                rb.sendRequest(null, new RequestCallback() {
+                    @Override
+                    public void onResponseReceived(Request request, Response response) {
+                        // 204 No Content: success — the lobby SSE stream will push the updated list.
+                        if (response.getStatusCode() == Response.SC_UNAUTHORIZED
+                                || response.getStatusCode() == Response.SC_FORBIDDEN) {
+                            view.showAlert(I18n.c().errNotAuthorised());
+                        } else if (response.getStatusCode() != Response.SC_NO_CONTENT) {
+                            view.showAlert(I18n.m().errDeleteFailedHttp(response.getStatusCode()));
+                        }
                     }
-                }
-                @Override
-                public void onError(Request request, Throwable exception) {
-                    view.showAlert(I18n.m().errDeleteFailed(exception.getMessage()));
-                }
-            });
-        } catch (RequestException e) {
-            GWT.log("Delete room failed: " + e.getMessage());
-        }
+                    @Override
+                    public void onError(Request request, Throwable exception) {
+                        view.showAlert(I18n.m().errDeleteFailed(exception.getMessage()));
+                    }
+                });
+            } catch (RequestException e) {
+                GWT.log("Delete room failed: " + e.getMessage());
+            }
+        });
     }
 }
