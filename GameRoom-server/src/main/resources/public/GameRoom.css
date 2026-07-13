@@ -225,6 +225,306 @@ td, th, span, p, div, label {
 }
 
 /* =============================================
+   Password prompt modal (join a locked room)
+   ============================================= */
+/* Glass backdrop behind the modal (GWT PopupPanel glass) */
+.pw-modal-glass {
+  background: rgba(6, 4, 13, 0.72);
+  -webkit-backdrop-filter: blur(5px);
+          backdrop-filter: blur(5px);
+  animation: pwGlassIn 0.2s ease both;
+}
+
+.pw-modal-popup { outline: none; }
+
+.pw-modal {
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  text-align: center;
+  padding: 26px 26px 22px;
+  background: linear-gradient(160deg, #1c1040 0%, #0f0820 100%);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255,255,255,0.04);
+  animation: pwModalIn 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.pw-modal-icon {
+  width: 46px;
+  height: 46px;
+  display: block;
+  margin: 0 auto 12px;
+  filter: drop-shadow(0 2px 8px rgba(251, 146, 60, 0.3));
+}
+
+.pw-modal-title {
+  font-family: 'Rajdhani', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 1.35em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-heading);
+  text-shadow: 0 0 20px rgba(251, 146, 60, 0.35);
+}
+
+.pw-modal-room {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-top: 2px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pw-modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+  letter-spacing: 0.28em;
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-size: 18px;
+  color: var(--color-text-primary);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: var(--radius-md);
+  padding: 11px 14px;
+  outline: none;
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.pw-modal-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.pw-modal-input--error {
+  border-color: var(--color-error);
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.18);
+}
+
+/* Reserves its own line so the modal doesn't jump when the error appears */
+.pw-modal-error {
+  min-height: 18px;
+  margin: 8px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-error);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.pw-modal-error--visible { opacity: 1; }
+
+.pw-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.pw-modal-btn {
+  flex: 1;
+  padding: 11px;
+  border-radius: var(--radius-md);
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition), filter var(--transition);
+}
+
+.pw-modal-cancel {
+  background: transparent;
+  border-color: rgba(139, 92, 246, 0.4);
+  color: var(--color-text-muted);
+}
+
+.pw-modal-cancel:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.7);
+  color: var(--color-text-primary);
+}
+
+.pw-modal-submit {
+  background: linear-gradient(145deg, #fdba74, #f97316);
+  border-color: #ea580c;
+  color: #431407;
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+
+.pw-modal-submit:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+@keyframes pwGlassIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pwModalIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pwShake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+.pw-modal--shake { animation: pwShake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pw-modal, .pw-modal-glass, .pw-modal--shake { animation: none; }
+}
+
+/* =============================================
+   Confirm modal (styled replacement for window.confirm)
+   Shares the .pw-modal-glass backdrop and pwModalIn entrance.
+   ============================================= */
+.confirm-modal-popup { outline: none; }
+
+.confirm-modal {
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  box-sizing: border-box;
+  text-align: center;
+  padding: 26px 26px 22px;
+  background: linear-gradient(160deg, #1c1040 0%, #0f0820 100%);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 70px rgba(0,0,0,0.6), 0 0 0 1px rgba(139, 92, 246, 0.15), inset 0 1px 0 rgba(255,255,255,0.04);
+  animation: pwModalIn 0.26s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.confirm-modal-icon {
+  width: 44px;
+  height: 44px;
+  display: block;
+  margin: 0 auto 14px;
+  filter: drop-shadow(0 2px 8px rgba(139, 92, 246, 0.3));
+}
+
+.confirm-modal-message {
+  color: var(--color-text-primary);
+  font-size: 15px;
+  line-height: 1.55;
+  margin-bottom: 22px;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-modal-btn {
+  flex: 1;
+  padding: 11px;
+  border-radius: var(--radius-md);
+  font-family: 'Nunito', system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition), filter var(--transition);
+}
+
+.confirm-modal-cancel {
+  background: transparent;
+  border-color: rgba(139, 92, 246, 0.4);
+  color: var(--color-text-muted);
+}
+
+.confirm-modal-cancel:hover {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.7);
+  color: var(--color-text-primary);
+}
+
+.confirm-modal-confirm {
+  background: linear-gradient(145deg, #a78bfa, #7c3aed);
+  border-color: #6d28d9;
+  color: #f5f3ff;
+  box-shadow: 2px 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.15);
+}
+
+.confirm-modal-confirm:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.confirm-modal-confirm--danger {
+  background: linear-gradient(145deg, #fb7185, #e11d48);
+  border-color: #be123c;
+  color: #fff1f2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-modal { animation: none; }
+}
+
+/* =============================================
+   Toast notifications (styled replacement for window.alert)
+   ============================================= */
+.toast-container {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  max-width: 420px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(160deg, #241443 0%, #140a26 100%);
+  border: 1px solid rgba(139, 92, 246, 0.4);
+  box-shadow: 0 12px 34px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  animation: toastIn 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.toast--out { animation: toastOut 0.22s ease forwards; }
+
+.toast-error { border-color: rgba(248, 113, 113, 0.55); }
+.toast-error .toast-icon { color: var(--color-error); }
+.toast-info  .toast-icon { color: var(--color-accent); }
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+}
+.toast-icon svg { width: 20px; height: 20px; }
+
+.toast-text { flex: 1; }
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast, .toast--out { animation: none; }
+}
+
+/* =============================================
    Create Room Card
    ============================================= */
 .create-room-card {

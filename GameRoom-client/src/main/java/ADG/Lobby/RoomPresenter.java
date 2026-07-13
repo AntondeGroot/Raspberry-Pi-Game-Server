@@ -4,7 +4,9 @@ import ADG.*;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import ADG.Utils.ChatCipher;
+import ADG.Utils.ConfirmDialog;
 import ADG.Utils.Cookie;
+import ADG.Utils.Notify;
 import ADG.Utils.EventSourceWrapper;
 import ADG.Utils.GameTranslations;
 import ADG.Utils.TimeUtils;
@@ -278,12 +280,16 @@ public class RoomPresenter implements Presenter {
     }
 
     private void leaveRoom() {
+        Runnable leave = () -> {
+            removePlayerFromRoom();
+            sendLeaveMessage();
+            presenterManager.switchToLobby();
+        };
         if (room.getStatus() == GameStatus.PLAYING) {
-            if (!Window.confirm(I18n.c().confirmLeavePlayingRoom())) return;
+            ConfirmDialog.show(I18n.c().confirmLeavePlayingRoom(), leave);
+        } else {
+            leave.run();
         }
-        removePlayerFromRoom();
-        sendLeaveMessage();
-        presenterManager.switchToLobby();
     }
 
     private void sendLeaveMessage() {
@@ -301,19 +307,19 @@ public class RoomPresenter implements Presenter {
     }
 
     private void deleteRoom() {
-        boolean confirmDelete = Window.confirm(I18n.c().confirmDeleteRoom());
-        if (!confirmDelete) return;
-        if (isAdmin) {
-            // Admins delete via the Spring Security-protected REST endpoint.
-            deleteRoomAsAdmin();
-        } else {
-            // Room creators delete via GWT-RPC. This path is NOT protected by Spring Security;
-            // authorization is enforced server-side in RoomServiceImpl by checking the playerid cookie.
-            roomService.deleteRoom(room.getId(), new AsyncCallback<Void>() {
-                @Override public void onFailure(Throwable throwable) {}
-                @Override public void onSuccess(Void unused) { presenterManager.switchToLobby(); }
-            });
-        }
+        ConfirmDialog.danger(I18n.c().confirmDeleteRoom(), I18n.c().deleteRoom(), () -> {
+            if (isAdmin) {
+                // Admins delete via the Spring Security-protected REST endpoint.
+                deleteRoomAsAdmin();
+            } else {
+                // Room creators delete via GWT-RPC. This path is NOT protected by Spring Security;
+                // authorization is enforced server-side in RoomServiceImpl by checking the playerid cookie.
+                roomService.deleteRoom(room.getId(), new AsyncCallback<Void>() {
+                    @Override public void onFailure(Throwable throwable) {}
+                    @Override public void onSuccess(Void unused) { presenterManager.switchToLobby(); }
+                });
+            }
+        });
     }
 
     private void deleteRoomAsAdmin() {
@@ -326,12 +332,12 @@ public class RoomPresenter implements Presenter {
                     if (response.getStatusCode() == Response.SC_NO_CONTENT) {
                         presenterManager.switchToLobby();
                     } else {
-                        Window.alert(I18n.m().errDeleteFailedHttp(response.getStatusCode()));
+                        Notify.error(I18n.m().errDeleteFailedHttp(response.getStatusCode()));
                     }
                 }
                 @Override
                 public void onError(Request request, Throwable exception) {
-                    Window.alert(I18n.m().errDeleteFailed(exception.getMessage()));
+                    Notify.error(I18n.m().errDeleteFailed(exception.getMessage()));
                 }
             });
         } catch (RequestException e) {

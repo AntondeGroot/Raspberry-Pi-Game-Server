@@ -2,6 +2,7 @@ package ADG.Lobby;
 
 import ADG.Utils.Cookie;
 import ADG.Utils.LanguageSelectorWidget;
+import ADG.Utils.Notify;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
@@ -122,7 +123,7 @@ public class LobbyView extends Composite {
     }
 
     public void showAlert(String msg) {
-        Window.alert(msg);
+        Notify.error(msg);
     }
 
     /**

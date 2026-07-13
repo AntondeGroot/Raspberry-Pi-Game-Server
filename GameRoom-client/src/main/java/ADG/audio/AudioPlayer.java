@@ -1,8 +1,7 @@
 package ADG.audio;
 
+import ADG.Utils.Notify;
 import com.google.gwt.core.client.GWT;
-import com.google.gwt.user.client.Timer;
-import com.google.gwt.user.client.Window;
 
 public class AudioPlayer {
 
@@ -21,12 +20,10 @@ public class AudioPlayer {
     playUrl(GWT.getHostPageBaseURL() + "assets/audio/" + filename, volume);
   }
 
-  /** Play the error sound, then show a Window.alert after a short delay so the sound starts first. */
+  /** Play the error sound and show a styled error toast. */
   public static void errorAlert(String message) {
     play(ERROR);
-    new Timer() {
-      @Override public void run() { Window.alert(message); }
-    }.schedule(150);
+    Notify.error(message);
   }
 
   private static native void playUrl(String url, double volume) /*-{

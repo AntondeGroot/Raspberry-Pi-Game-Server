@@ -1,11 +1,11 @@
 package ADG.Lobby;
 
 import ADG.Utils.LanguageSelectorWidget;
+import ADG.Utils.Notify;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.uibinder.client.UiBinder;
 import com.google.gwt.uibinder.client.UiField;
-import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.ui.*;
 
 public class CharacterSelectionView extends Composite {
@@ -43,6 +43,6 @@ public class CharacterSelectionView extends Composite {
     public Button getCancelButton() { return cancelButton; }
 
     public void showAlert(String message) {
-        Window.alert(message);
+        Notify.error(message);
     }
 }

@@ -3,6 +3,7 @@ package ADG.Lobby;
 import ADG.Presenter;
 import ADG.PresenterManager;
 import ADG.Utils.Cookie;
+import ADG.Utils.Notify;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
@@ -119,7 +120,7 @@ public class GameOptionsPresenter implements Presenter {
     private void onConfirm() {
         int maxPlayers = view.getMaxPlayers();
         if (maxPlayers < view.getMinBound() || maxPlayers > view.getMaxBound()) {
-            Window.alert(I18n.m().errMaxPlayersBetween(view.getMinBound(), view.getMaxBound()));
+            Notify.error(I18n.m().errMaxPlayersBetween(view.getMinBound(), view.getMaxBound()));
             return;
         }
         room.setMaxPlayers(maxPlayers);
@@ -149,7 +150,7 @@ public class GameOptionsPresenter implements Presenter {
                     errorMsg = t.getMessage();
                 }
                 GWT.log("Failed to update room: " + errorMsg);
-                Window.alert("Failed to save game options: " + errorMsg);
+                Notify.error("Failed to save game options: " + errorMsg);
             }
             @Override public void onSuccess(Void v) {
                 GWT.log("Room updated successfully, switching to room");
