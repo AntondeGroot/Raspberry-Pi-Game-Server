@@ -280,18 +280,27 @@ public class GameOptionsView extends Composite {
         var self = this;
         var frame = this.@ADG.Lobby.GameOptionsView::gameSettingsFrame;
         var frameEl = frame.@com.google.gwt.user.client.ui.UIObject::getElement()();
+        var postAdminStatus = function() {
+            if (frameEl.contentWindow) {
+                frameEl.contentWindow.postMessage({ type: 'qwixx-admin-status', isAdmin: isAdmin }, '*');
+            }
+        };
         var handler = function(event) {
-            if (event.data && event.data.type === 'qwixx-options-changed'
-                    && event.data.options) {
+            if (!event.data) return;
+            // The embedded settings page tells us it has registered its own message
+            // listener; only now is it guaranteed to receive the admin status. This
+            // closes the race where an on-load post arrives before the iframe listens.
+            if (event.data.type === 'qwixx-embed-ready') {
+                postAdminStatus();
+            } else if (event.data.type === 'qwixx-options-changed' && event.data.options) {
                 var json = JSON.stringify(event.data.options);
                 self.@ADG.Lobby.GameOptionsView::onIframeMessage(Ljava/lang/String;)(json);
             }
         };
         $wnd._gameOptionsMessageHandler = handler;
         $wnd.addEventListener('message', handler);
-        frameEl.addEventListener('load', function() {
-            frameEl.contentWindow.postMessage({ type: 'qwixx-admin-status', isAdmin: isAdmin }, '*');
-        });
+        // Fallback for older embeds that don't send a ready handshake.
+        frameEl.addEventListener('load', postAdminStatus);
     }-*/;
 
     public native void tearDownMessageListener() /*-{
