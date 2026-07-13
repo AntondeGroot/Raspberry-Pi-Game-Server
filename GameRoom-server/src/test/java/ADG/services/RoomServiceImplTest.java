@@ -1138,10 +1138,11 @@ class RoomServiceImplTest {
     }
 
     @Test
-    void generatedPasswordMatchesCvcvcPattern() throws RoomServiceException {
+    void generatedPasswordMatchesCvcDigitDigitPattern() throws RoomServiceException {
         // Run several times to reduce the chance of a false-negative
         String vowels     = "AEU";
         String consonants = "CDFHJKMNPRTWXY";
+        String digits     = "23456789";
         for (int i = 0; i < 50; i++) {
             Room room = buildRoom("Alpha" + i);
             service.createRoom(room);
@@ -1151,9 +1152,47 @@ class RoomServiceImplTest {
             assertTrue(consonants.indexOf(pwd.charAt(0)) >= 0, "char 0 must be a consonant: " + pwd);
             assertTrue(vowels    .indexOf(pwd.charAt(1)) >= 0, "char 1 must be a vowel: "     + pwd);
             assertTrue(consonants.indexOf(pwd.charAt(2)) >= 0, "char 2 must be a consonant: " + pwd);
-            assertTrue(vowels    .indexOf(pwd.charAt(3)) >= 0, "char 3 must be a vowel: "     + pwd);
-            assertTrue(consonants.indexOf(pwd.charAt(4)) >= 0, "char 4 must be a consonant: " + pwd);
+            assertTrue(digits    .indexOf(pwd.charAt(3)) >= 0, "char 3 must be a digit: "     + pwd);
+            assertTrue(digits    .indexOf(pwd.charAt(4)) >= 0, "char 4 must be a digit: "     + pwd);
         }
+    }
+
+    @Test
+    void updateRoomPasswordByCreatorSetsCustomValue() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        service.setRoomPassword(room.getId(), true);
+
+        service.updateRoomPassword(room.getId(), "  my pass 7 ");
+
+        // whitespace stripped, upper-cased
+        assertEquals("MYPASS7", service.getRoomById(room.getId()).getRoomPassword());
+    }
+
+    @Test
+    void updateRoomPasswordEmptyThrows() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        service.setRoomPassword(room.getId(), true);
+
+        assertThrows(RoomServiceException.class,
+                () -> service.updateRoomPassword(room.getId(), "   "),
+                "empty password must be rejected");
+    }
+
+    @Test
+    void updateRoomPasswordByNonCreatorThrows() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        service.createRoom(room);
+        service.publishRoom(room.getId());
+        service.setRoomPassword(room.getId(), true);
+        doReturn("other-player").when(service).getPlayerIdFromRequest();
+
+        assertThrows(RoomServiceException.class,
+                () -> service.updateRoomPassword(room.getId(), "SECRET1"),
+                "non-creator must not be able to change the password");
     }
 
     @Test

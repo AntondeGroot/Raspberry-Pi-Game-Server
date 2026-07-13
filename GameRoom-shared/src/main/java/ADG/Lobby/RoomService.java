@@ -23,4 +23,5 @@ public interface RoomService extends RemoteService {
     void setRoomGame(String roomId, String gameId) throws RoomServiceException;
     void setRoomPermissions(String roomId, boolean anyPlayerCanSelectGame, boolean anyPlayerCanSetOptions) throws RoomServiceException;
     void setRoomPassword(String roomId, boolean enabled) throws RoomServiceException;
+    void updateRoomPassword(String roomId, String password) throws RoomServiceException;
 }

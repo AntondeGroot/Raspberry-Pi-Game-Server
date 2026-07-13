@@ -31,4 +31,5 @@ public interface RoomServiceAsync {
     void setRoomGame(String roomId, String gameId, AsyncCallback<Void> callback);
     void setRoomPermissions(String roomId, boolean anyPlayerCanSelectGame, boolean anyPlayerCanSetOptions, AsyncCallback<Void> callback);
     void setRoomPassword(String roomId, boolean enabled, AsyncCallback<Void> callback);
+    void updateRoomPassword(String roomId, String password, AsyncCallback<Void> callback);
 }

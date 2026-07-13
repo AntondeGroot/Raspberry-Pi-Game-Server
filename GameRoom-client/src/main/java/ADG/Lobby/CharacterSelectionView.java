@@ -28,6 +28,10 @@ public class CharacterSelectionView extends Composite {
         initWidget(uiBinder.createAndBindUi(this));
         langSelectorRow.add(new LanguageSelectorWidget());
         usernameInput.setMaxLength(10);
+        // Prevent the browser autofilling saved credentials (e.g. an admin username) here.
+        usernameInput.getElement().setAttribute("autocomplete", "off");
+        usernameInput.getElement().setAttribute("data-lpignore", "true");
+        usernameInput.getElement().setAttribute("data-1p-ignore", "true");
         pageTitle.setHTML("<h1>" + I18n.c().characterSelection() + "</h1>");
         enterUsernameLabel.setHTML("<span class=\"step-label\">" + I18n.c().enterUsername() + "</span>");
         selectProfileLabel.setHTML("<span class=\"step-label\">" + I18n.c().selectProfilePicture() + "</span>");

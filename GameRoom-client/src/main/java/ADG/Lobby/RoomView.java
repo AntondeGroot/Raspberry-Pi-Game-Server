@@ -81,6 +81,17 @@ public class RoomView extends Composite {
     Label passwordDisplayLabel;
 
     @UiField
+    FlowPanel passwordEditPanel;
+
+    @UiField
+    TextBox passwordEditInput;
+
+    @UiField
+    Button regeneratePasswordButton;
+
+    private String lastRenderedPassword;
+
+    @UiField
     TextArea messageDisplayField;
 
     @UiField
@@ -100,7 +111,20 @@ public class RoomView extends Composite {
         anyPlayerCanSetOptionsCheckbox.setText(I18n.c().anyPlayerCanSetOptions());
         passwordRequiredCheckbox.setText(I18n.c().requirePassword());
         permissionsPanel.setVisible(false);
+
+        regeneratePasswordButton.setText("🎲");
+        regeneratePasswordButton.setTitle(I18n.c().regeneratePassword());
+        passwordEditInput.setMaxLength(20);
+        passwordEditInput.setTitle(I18n.c().editPasswordHint());
+        passwordEditInput.getElement().setAttribute("autocomplete", "off");
+        passwordEditInput.getElement().setAttribute("autocapitalize", "characters");
+        passwordEditInput.getElement().setAttribute("spellcheck", "false");
+        passwordEditInput.getElement().setAttribute("data-lpignore", "true");
+        passwordEditInput.getElement().setAttribute("data-1p-ignore", "true");
     }
+
+    public TextBox getPasswordEditInput() { return passwordEditInput; }
+    public Button getRegeneratePasswordButton() { return regeneratePasswordButton; }
 
     public Button getLeaveRoomButton() { return leaveRoomButton; }
     public Button getDeleteRoomButton() { return deleteRoomButton; }
@@ -141,13 +165,28 @@ public class RoomView extends Composite {
     public CheckBox getAnyPlayerCanSetOptionsCheckbox() { return anyPlayerCanSetOptionsCheckbox; }
     public CheckBox getPasswordRequiredCheckbox() { return passwordRequiredCheckbox; }
 
-    public void updatePasswordDisplay(String password) {
-        if (password != null && !password.isEmpty()) {
+    public void updatePasswordDisplay(String password, boolean isCreator) {
+        boolean hasPassword = password != null && !password.isEmpty();
+        if (!hasPassword) {
+            passwordDisplayLabel.setVisible(false);
+            passwordEditPanel.setVisible(false);
+            lastRenderedPassword = null;
+            return;
+        }
+        if (isCreator) {
+            // The creator gets an editable field. Only overwrite it when the value
+            // actually changed, so an unrelated room update doesn't clobber typing.
+            if (!password.equals(lastRenderedPassword)) {
+                passwordEditInput.setValue(password);
+            }
+            passwordEditPanel.setVisible(true);
+            passwordDisplayLabel.setVisible(false);
+        } else {
             passwordDisplayLabel.setText("🔑 " + password);
             passwordDisplayLabel.setVisible(true);
-        } else {
-            passwordDisplayLabel.setVisible(false);
+            passwordEditPanel.setVisible(false);
         }
+        lastRenderedPassword = password;
     }
 
     public void populateGameSelector(ArrayList<GameDefinition> games) {

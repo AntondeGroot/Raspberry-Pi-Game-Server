@@ -64,7 +64,15 @@ public class PasswordPromptDialog {
         card.add(roomLabel);
 
         input.setStyleName("pw-modal-input");
-        input.getElement().setAttribute("autocomplete", "off");
+        // Keep the browser's password manager away — this is a room password, not
+        // a login, and we don't want saved admin credentials autofilled here.
+        input.getElement().setAttribute("autocomplete", "new-password");
+        input.getElement().setAttribute("name", "gameroom-room-password");
+        input.getElement().setAttribute("autocorrect", "off");
+        input.getElement().setAttribute("autocapitalize", "none");
+        input.getElement().setAttribute("spellcheck", "false");
+        input.getElement().setAttribute("data-lpignore", "true");
+        input.getElement().setAttribute("data-1p-ignore", "true");
         card.add(input);
 
         error.setStyleName("pw-modal-error");
@@ -98,18 +106,21 @@ public class PasswordPromptDialog {
     }
 
     /**
-     * Shows the dialog for {@code roomName}. {@code verifier} decides whether the
-     * typed password is correct; on success the dialog closes and {@code onSuccess}
-     * runs, on failure it shakes and shows an inline error.
+     * Shows the dialog for {@code roomName}. {@code prefill} pre-populates the
+     * field (e.g. a password this browser used before — may be {@code null}).
+     * {@code verifier} decides whether the typed password is correct; on success
+     * the dialog closes and {@code onSuccess} runs, on failure it shakes and
+     * shows an inline error.
      */
-    public void show(String roomName, Verifier verifier, Runnable onSuccess) {
+    public void show(String roomName, String prefill, Verifier verifier, Runnable onSuccess) {
         this.verifier = verifier;
         this.onSuccess = onSuccess;
         roomLabel.setText(roomName);
         clearError();
-        input.setText("");
+        input.setText(prefill != null ? prefill : "");
         popup.center(); // centres and shows
         input.setFocus(true);
+        input.selectAll(); // so a prefilled value can be overtyped in one go
     }
 
     private void submit() {

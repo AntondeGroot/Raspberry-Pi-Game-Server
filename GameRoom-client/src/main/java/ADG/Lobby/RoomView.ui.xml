@@ -14,6 +14,11 @@
             </g:FlowPanel>
             <g:HTML ui:field="optionsDiffList" styleName="room-options-diff"/>
             <g:Label ui:field="passwordDisplayLabel" visible="false" styleName="room-password-badge"/>
+            <g:FlowPanel ui:field="passwordEditPanel" visible="false" styleName="room-password-edit">
+                <g:Label ui:field="passwordEditIcon" text="🔑" styleName="room-password-edit-icon"/>
+                <g:TextBox ui:field="passwordEditInput" styleName="room-password-input"/>
+                <g:Button ui:field="regeneratePasswordButton" styleName="room-password-regen"/>
+            </g:FlowPanel>
             <g:FlowPanel ui:field="permissionsPanel" styleName="room-permissions-panel">
                 <g:CheckBox ui:field="anyPlayerCanSelectGameCheckbox"/>
                 <g:CheckBox ui:field="anyPlayerCanSetOptionsCheckbox"/>

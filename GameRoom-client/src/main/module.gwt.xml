@@ -5,6 +5,7 @@
   <inherits name="com.google.gwt.http.HTTP"/>
   <inherits name="com.google.gwt.json.JSON"/>
   <inherits name="com.google.gwt.i18n.I18N"/>
+  <inherits name="com.google.gwt.storage.Storage"/>
 
   <extend-property name="locale" values="en,nl,nb,de,fr,it"/>
   <set-property-fallback name="locale" value="en"/>

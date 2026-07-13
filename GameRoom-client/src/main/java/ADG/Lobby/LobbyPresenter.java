@@ -5,6 +5,7 @@ import ADG.Utils.ConfirmDialog;
 import ADG.Utils.Cookie;
 import ADG.Utils.EventSourceWrapper;
 import ADG.Utils.PasswordPromptDialog;
+import ADG.Utils.RoomPasswordStore;
 import ADG.audio.AudioPlayer;
 import ADG.i18n.I18n;
 import com.google.gwt.core.client.GWT;
@@ -78,8 +79,14 @@ public class LobbyPresenter implements Presenter {
             } else if (room.hasPassword()) {
                 new PasswordPromptDialog().show(
                         room.getName(),
+                        RoomPasswordStore.get(room.getId()),
                         entered -> entered.equalsIgnoreCase(room.getRoomPassword()),
-                        () -> navigateToCharacterSelection(room));
+                        () -> {
+                            // Remember it so a removed player can re-enter later,
+                            // even once the room is empty.
+                            RoomPasswordStore.put(room.getId(), room.getRoomPassword());
+                            navigateToCharacterSelection(room);
+                        });
             } else {
                 navigateToCharacterSelection(room);
             }
