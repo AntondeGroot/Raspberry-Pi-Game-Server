@@ -1203,7 +1203,7 @@ table.full-height {
   display: flex;
   justify-content: right;
   align-items: center;
-  padding: 4px 0 8px;
+  padding: 4px 12px 8px;
 }
 
 /* Admin login shortcut — only visible when the admin_hint cookie is present
@@ -1217,7 +1217,7 @@ table.full-height {
   font-family: 'Nunito', sans-serif;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
+  padding: 4px 12px;
   margin-right: auto;
   cursor: pointer;
   letter-spacing: 0.05em;
