@@ -599,9 +599,8 @@ public class RoomView extends Composite {
     }-*/;
 
     public void showRoomName(String roomName) {
-        String fullTitle = I18n.c().roomPrefix() + " " + roomName;
-        roomTitle.setInnerText(fullTitle);
-        int len = fullTitle.length();
+        roomTitle.setInnerText(roomName);
+        int len = roomName.length();
         if (len <= 12) {
             roomTitle.setClassName("room-title-short");
         } else if (len <= 22) {
