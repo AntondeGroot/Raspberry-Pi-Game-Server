@@ -791,13 +791,15 @@ class RoomServiceImplTest {
     }
 
     @Test
-    void verifyGameSessionsExistResetsRoomToWaitingWhenGameFinished() {
+    void verifyGameSessionsExistResetsRoomToWaitingWhenGameFinishedAndPlayerIsBack() {
         Room room = buildPlayingRoom("Alpha", "session-1");
         when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
         // GET /games/{sid} returns status: FINISHED — matches Qwixx's GameInfo OpenAPI shape
         when(restTemplate.getForObject("http://game-server/games/session-1", Map.class))
                 .thenReturn(Map.of("sessionId", "session-1", "status", "FINISHED",
                                    "playerCount", 1, "maxPlayers", 4));
+        // A player has returned to the room page (live SSE) — they want to pick the next game.
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(true);
 
         service.verifyGameSessionsExist();
 
@@ -805,6 +807,50 @@ class RoomServiceImplTest {
         assertNotNull(updated, "room must still exist after game finishes");
         assertEquals(GameStatus.WAITING, updated.getStatus(), "room must reset to WAITING");
         assertNull(updated.getGameSessionId(), "session ID must be cleared");
+    }
+
+    @Test
+    void verifyGameSessionsExistKeepsRoomPlayingWhenGameFinishedButPlayersStillInGame() {
+        // The bug: a finished game whose players are still on the game server (score screen, about to
+        // restart the same session) has no room-page SSE. Resetting then severs the session so the
+        // restart is invisible AND drops the room into the empty-room reaper mid-replay. It must stay
+        // PLAYING until a player actually returns.
+        Room room = buildPlayingRoom("Alpha", "session-1");
+        when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
+        when(restTemplate.getForObject("http://game-server/games/session-1", Map.class))
+                .thenReturn(Map.of("sessionId", "session-1", "status", "FINISHED",
+                                   "playerCount", 1, "maxPlayers", 4));
+        when(restTemplate.getForObject("http://game-server/gamestates/session-1", Map.class))
+                .thenReturn(Map.of("version", 7));
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(false);
+
+        service.verifyGameSessionsExist();
+
+        Room updated = service.getRoomById(room.getId());
+        assertNotNull(updated, "room must survive so a restart stays linked");
+        assertEquals(GameStatus.PLAYING, updated.getStatus(), "room stays PLAYING until a player returns");
+        assertEquals("session-1", updated.getGameSessionId(), "the session link must be preserved");
+    }
+
+    @Test
+    void verifyGameSessionsExistStillReapsAnAbandonedFinishedGameAfterOneHour() {
+        // Safety net: a finished game nobody returns to or restarts is still cleaned up after the
+        // inactivity TTL — the fix must not leak such rooms forever.
+        Room room = buildPlayingRoom("Alpha", "session-1");
+        when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
+        when(restTemplate.getForObject("http://game-server/games/session-1", Map.class))
+                .thenReturn(Map.of("sessionId", "session-1", "status", "FINISHED",
+                                   "playerCount", 1, "maxPlayers", 4));
+        when(restTemplate.getForObject("http://game-server/gamestates/session-1", Map.class))
+                .thenReturn(Map.of("version", 7));
+        when(sseRegistry.hasSubscribers(room.getId())).thenReturn(false);
+
+        service.verifyGameSessionsExist(); // stores version 7 with current timestamp
+        roomStore.gameStateVersionTimestamps.put(room.getId(), System.currentTimeMillis() - (2 * 60 * 60 * 1000L));
+        service.verifyGameSessionsExist(); // same version, now stale → cleaned up
+
+        verify(restTemplate).delete("http://game-server/games/session-1");
+        assertNull(service.getRoomById(room.getId()), "an abandoned finished game is still reaped");
     }
 
     // ── SSE emit verification ────────────────────────────────────────────────
