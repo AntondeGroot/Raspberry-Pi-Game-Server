@@ -9,8 +9,24 @@ echo "=== last 50 log lines ==="
 $SSH "journalctl -u gameroom -n 150 --no-pager" 2>&1 || true
 
 echo ""
-echo "=== errors in journal ==="
-$SSH "journalctl -u gameroom --no-pager -r -o cat | grep -E -m 5 -A 3 -B 5 'Z[[:space:]]+(ERROR|WARN)[[:space:]]+[0-9]+' | tac | awk 'NR==1{n=1; printf \"--- error %d ---\n\", n} /^--\$/{n++; printf \"\n--- error %d ---\n\", n; next} /Z[[:space:]]+(ERROR|WARN)/{print \">>> \" \$0; next} {print}'" 2>&1 || true
+echo "=== recent errors (newest first) ==="
+$SSH "journalctl -u gameroom -n 5000 --no-pager -o cat | awk '
+  /^[0-9][0-9][0-9][0-9]-[A-Za-z][A-Za-z][A-Za-z]-[0-9][0-9] [0-9:.]+ (ERROR|WARN)[[:space:]]/ { errs[++n] = NR }
+  { L[NR] = \$0 }
+  END {
+    if (n == 0) { print \"(no ERROR/WARN entries in the last 5000 log lines)\"; exit }
+    start = (n > 5 ? n - 4 : 1)
+    k = 0
+    for (i = n; i >= start; i--) {
+      printf \"\n--- error %d of %d (most recent first) ---\n\", ++k, (n < 5 ? n : 5)
+      print L[errs[i]]
+      for (j = errs[i] + 1; j <= NR && j <= errs[i] + 20; j++) {
+        if (L[j] ~ /^[0-9][0-9][0-9][0-9]-[A-Za-z][A-Za-z][A-Za-z]-[0-9][0-9] /) break
+        print L[j]
+      }
+    }
+  }
+'" 2>&1 || true
 
 echo ""
 echo "=== jar file ==="

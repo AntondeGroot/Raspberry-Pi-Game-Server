@@ -42,7 +42,7 @@ After=network.target
 
 [Service]
 User=ubuntu
-ExecStart=/usr/bin/java -jar /opt/gameroom/gameroom.jar
+ExecStart=/usr/bin/java --add-opens java.base/java.lang=ALL-UNNAMED -jar /opt/gameroom/gameroom.jar
 Restart=on-failure
 
 [Install]

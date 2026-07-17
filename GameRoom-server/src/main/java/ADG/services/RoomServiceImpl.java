@@ -617,14 +617,30 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
             }
 
             if (gameInfo != null && "FINISHED".equals(gameInfo.get("status"))) {
-                logger.info("Game session finished for room {}, resetting to WAITING", room.getId());
-                room.setStatus(GameStatus.WAITING);
-                room.setGameSessionId(null);
-                roomStore.gameStateVersions.remove(room.getId());
-                roomStore.gameStateVersionTimestamps.remove(room.getId());
-                emitRoomUpdate(room.getId());
-                emitLobbyUpdate();
-                continue;
+                // A finished game only means "back to the lobby" once a player is actually here to
+                // pick the next one. While everyone is still on the game server — playing, on the
+                // end-of-game/score screen, or about to restart the SAME session — the room has no
+                // SSE subscribers (the client has navigated into the game). Resetting then is
+                // premature: it severs the session link so a restart becomes invisible, and it flips
+                // the room to WAITING where the empty-room reaper can delete it mid-replay. So only
+                // reset when a player has returned (has a live SSE connection); otherwise leave the
+                // room PLAYING and fall through to the staleness check below, which still cleans up a
+                // genuinely abandoned finished game after INACTIVE_GAME_TTL_MS. The instant path when
+                // a player uses the game's "leave" button is handled separately by the game-finished
+                // callback. This keeps the fix game-agnostic — it applies to every embedded game.
+                if (sseRegistry.hasSubscribers(room.getId())) {
+                    logger.info("Game session finished for room {} and a player is back — resetting to WAITING",
+                            room.getId());
+                    room.setStatus(GameStatus.WAITING);
+                    room.setGameSessionId(null);
+                    roomStore.gameStateVersions.remove(room.getId());
+                    roomStore.gameStateVersionTimestamps.remove(room.getId());
+                    emitRoomUpdate(room.getId());
+                    emitLobbyUpdate();
+                    continue;
+                }
+                logger.debug("Game finished for room {} but players are still on the game server; "
+                        + "keeping it PLAYING so a restart stays linked", room.getId());
             }
 
             Map<?, ?> gameStateData;
