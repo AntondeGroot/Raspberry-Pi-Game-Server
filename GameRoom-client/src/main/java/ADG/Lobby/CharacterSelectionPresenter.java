@@ -13,11 +13,14 @@ import com.google.gwt.event.shared.HandlerRegistration;
 import com.google.gwt.core.client.GWT;
 import com.google.gwt.json.client.*;
 import com.google.gwt.user.client.History;
+import com.google.gwt.user.client.Random;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 import com.google.gwt.user.client.ui.Image;
 import com.google.gwt.user.client.ui.Widget;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class CharacterSelectionPresenter implements Presenter {
@@ -109,6 +112,17 @@ public class CharacterSelectionPresenter implements Presenter {
         view.getProfilePicGrid().clear();
         canvases = new Canvas[SpriteSheets.totalSprites()];
 
+        Set<Integer> takenIndices = computeTakenIndices();
+
+        int globalOffset = 0;
+        for (SpriteSheets.Sheet sheet : SpriteSheets.all()) {
+            if (!sheet.botOnly) loadSheet(sheet, globalOffset, takenIndices);
+            globalOffset += sheet.total();
+        }
+    }
+
+    /** Global indices already taken by other players (empty when duplicates are allowed). */
+    private Set<Integer> computeTakenIndices() {
         Set<Integer> takenIndices = new HashSet<>();
         if (room.isUniqueProfilePics()) {
             String myId = ADG.Utils.Cookie.getPlayerId();
@@ -117,12 +131,26 @@ public class CharacterSelectionPresenter implements Presenter {
                 try { takenIndices.add(Integer.parseInt(entry.getValue())); } catch (NumberFormatException ignored) {}
             }
         }
+        return takenIndices;
+    }
 
+    /** A random selectable profile index (non-bot, non-excluded, not taken), or -1 if none is free. */
+    private int randomAvailableProfileIndex() {
+        Set<Integer> takenIndices = computeTakenIndices();
+        List<Integer> available = new ArrayList<>();
         int globalOffset = 0;
         for (SpriteSheets.Sheet sheet : SpriteSheets.all()) {
-            if (!sheet.botOnly) loadSheet(sheet, globalOffset, takenIndices);
+            if (!sheet.botOnly) {
+                for (int local = 0; local < sheet.total(); local++) {
+                    if (sheet.isExcluded(local)) continue;
+                    int globalIndex = globalOffset + local;
+                    if (!takenIndices.contains(globalIndex)) available.add(globalIndex);
+                }
+            }
             globalOffset += sheet.total();
         }
+        if (available.isEmpty()) return -1;
+        return available.get(Random.nextInt(available.size()));
     }
 
     private void loadSheet(SpriteSheets.Sheet sheet, int globalOffset, Set<Integer> takenIndices) {
@@ -202,8 +230,11 @@ public class CharacterSelectionPresenter implements Presenter {
             return;
         }
         if (selectedProfileIndex == -1) {
-            AudioPlayer.errorAlert(I18n.c().errSelectProfilePicture());
-            return;
+            selectedProfileIndex = randomAvailableProfileIndex();
+            if (selectedProfileIndex == -1) {
+                AudioPlayer.errorAlert(I18n.c().errSelectProfilePicture());
+                return;
+            }
         }
         AudioPlayer.play(AudioPlayer.BUTTON_CLICK);
 
