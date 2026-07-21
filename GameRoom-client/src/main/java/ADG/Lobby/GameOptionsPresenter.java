@@ -53,11 +53,14 @@ public class GameOptionsPresenter implements Presenter {
             } else {
                 // URL could not be resolved — fall back to generic widgets.
                 GWT.log("[GameOptions] WARNING: baseUrl null despite embeddedSettings=true, falling back to generic options");
+                view.hideGameSettingsFrame();
                 loadGenericOptions();
             }
         } else {
             // No embedded settings page: fetch the option definitions and render
             // them using generic GWT widgets (checkbox, number input, drop-down).
+            // Hide any iframe left over from a previously selected embedded game.
+            view.hideGameSettingsFrame();
             loadGenericOptions();
         }
     }

@@ -67,11 +67,11 @@ public interface AppConstants extends Constants {
     String continueButton();
 
     // Static error / confirm messages
-    String errRoomNameEmpty();
     String errRoomNameTooShort();
     String errRoomNameTooLong();
     String errSelectGame();
     String errRoomNameExists();
+    String errNoRandomRoomNames();
     String errNotAuthorised();
     String errPleaseEnterUsername();
     String errSelectProfilePicture();
