@@ -137,6 +137,10 @@ public class App implements EntryPoint {
 					}
 				}
 			});
+		} else if (token.equals("admin")) {
+			// Admin ops-logs page. The endpoint is ADMIN-guarded; a non-admin who
+			// deep-links here gets a 401 and is bounced back to the lobby.
+			presenterManager.switchToAdmin();
 		} else if (token.startsWith("joining=")) {
 			String roomId = token.substring("joining=".length());
 			roomService.getRoomById(roomId, new AsyncCallback<Room>() {

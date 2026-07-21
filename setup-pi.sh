@@ -42,12 +42,17 @@ After=network.target
 
 [Service]
 User=ubuntu
+# Grant the service read access to journald (systemd-journal) and nginx logs (adm)
+# so the admin "Ops · Error Logs" page can read them without sudo.
+SupplementaryGroups=systemd-journal adm
 ExecStart=/usr/bin/java --add-opens java.base/java.lang=ALL-UNNAMED -jar /opt/gameroom/gameroom.jar
 Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 EOF"
+# Also add the ubuntu user to these groups (harmless if the unit already grants them).
+$SSH "sudo usermod -aG systemd-journal,adm ubuntu || true"
 $SSH "sudo systemctl daemon-reload && sudo systemctl enable gameroom"
 
 echo "☁️  Installing cloudflared..."

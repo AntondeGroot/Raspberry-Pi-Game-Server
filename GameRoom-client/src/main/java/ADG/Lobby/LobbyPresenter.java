@@ -60,6 +60,8 @@ public class LobbyPresenter implements Presenter {
         view.getCreateRoomTitle().addClickHandler(event -> view.toggleCreateRoom());
         view.setDeleteHandler(this::deleteRoomAsAdmin);
         view.setRemovePlayerHandler(this::removePlayerAsAdmin);
+        view.getAdminLogsButton().addClickHandler(event -> presenterManager.switchToAdmin());
+        view.getAdminLogoutButton().addClickHandler(event -> logoutAsAdmin());
         view.getCreateRoomButton().addClickHandler(event -> {
             String roomName = view.getRoomNameInput().getText().trim();
             if (roomName.isEmpty()) {
@@ -403,6 +405,30 @@ public class LobbyPresenter implements Presenter {
                 GWT.log("Remove player failed: " + e.getMessage());
             }
         });
+    }
+
+    /**
+     * Logs the admin out via POST /logout (POST prevents logout CSRF), then reloads
+     * the lobby so it comes back in logged-out state. Reloads even on error so the
+     * user isn't stuck if the request fails.
+     */
+    private void logoutAsAdmin() {
+        RequestBuilder rb = new RequestBuilder(RequestBuilder.POST, "/logout");
+        rb.setHeader("Accept", "application/json");
+        try {
+            rb.sendRequest(null, new RequestCallback() {
+                @Override
+                public void onResponseReceived(Request request, Response response) {
+                    Window.Location.assign("/");
+                }
+                @Override
+                public void onError(Request request, Throwable exception) {
+                    Window.Location.assign("/");
+                }
+            });
+        } catch (RequestException e) {
+            GWT.log("Logout failed: " + e.getMessage());
+        }
     }
 
     private void deleteRoomAsAdmin(Room room) {

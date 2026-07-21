@@ -8,6 +8,9 @@ public class GameDefinition implements IsSerializable {
     private String name;
     private String baseUrl;
     private String healthUrl;
+    /** systemd unit name (e.g. "keezen.service") — used by the admin logs page to
+     *  read this game's journald logs. Null when the game isn't a local systemd service. */
+    private String unit;
     private int minPlayers;
     private int maxPlayers;
     /** True when the game server exposes a /settings?embed=1 page that can be
@@ -27,6 +30,9 @@ public class GameDefinition implements IsSerializable {
 
     public String getHealthUrl() { return healthUrl != null ? healthUrl : baseUrl; }
     public void setHealthUrl(String healthUrl) { this.healthUrl = healthUrl; }
+
+    public String getUnit() { return unit; }
+    public void setUnit(String unit) { this.unit = unit; }
 
     public int getMinPlayers() { return minPlayers; }
     public void setMinPlayers(int minPlayers) { this.minPlayers = minPlayers; }
