@@ -104,12 +104,29 @@ public class GameOptionsView extends Composite {
             optionsParam = "&options=" + URL.encodeQueryString(json.toString());
         }
 
+        // Showing the embedded settings — make sure the generic-widget panel
+        // (from a previously selected non-embedded game) isn't left visible.
+        gameSpecificOptionsPanel.clear();
+        gameSpecificOptionsPanel.setVisible(false);
+
         String url = baseUrl + "/settings?embed=1&lang=" + URL.encodeQueryString(lang) + optionsParam;
         GWT.log("Embedding game settings frame: " + url);
         gameSettingsFrame.setUrl(url);
         gameSettingsFrame.setVisible(true);
 
         setupMessageListener(isAdmin);
+    }
+
+    /**
+     * Hides and unloads the embedded settings iframe. Called when the selected game
+     * has no embedded settings, so a Qwixx iframe (or any prior game's) doesn't linger
+     * on top of the next game's options — this view is reused across games.
+     */
+    public void hideGameSettingsFrame() {
+        tearDownMessageListener();
+        iframeOptions = null;
+        gameSettingsFrame.setUrl("about:blank"); // unload the previously embedded page
+        gameSettingsFrame.setVisible(false);
     }
 
     /** Called from JSNI when the iframe posts a 'qwixx-options-changed' message. */

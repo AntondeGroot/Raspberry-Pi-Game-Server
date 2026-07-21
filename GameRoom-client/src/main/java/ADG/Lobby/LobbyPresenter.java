@@ -12,11 +12,16 @@ import com.google.gwt.core.client.GWT;
 import com.google.gwt.http.client.*;
 import com.google.gwt.json.client.*;
 import com.google.gwt.user.client.History;
+import com.google.gwt.user.client.Random;
 import com.google.gwt.user.client.Window;
 import com.google.gwt.user.client.rpc.AsyncCallback;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Consumer;
 
 public class LobbyPresenter implements Presenter {
 
@@ -58,7 +63,14 @@ public class LobbyPresenter implements Presenter {
         view.getCreateRoomButton().addClickHandler(event -> {
             String roomName = view.getRoomNameInput().getText().trim();
             if (roomName.isEmpty()) {
-                AudioPlayer.errorAlert(I18n.c().errRoomNameEmpty());
+                // No name entered — pick a random name that isn't already taken and
+                // create the room with it, so a player who doesn't care about the name
+                // can just make a room.
+                AudioPlayer.play(AudioPlayer.BUTTON_CLICK);
+                pickRandomAvailableName(name -> {
+                    view.getRoomNameInput().setText(name);
+                    createRoom(name);
+                });
                 return;
             }
             if (roomName.length() < 3) {
@@ -72,7 +84,10 @@ public class LobbyPresenter implements Presenter {
             AudioPlayer.play(AudioPlayer.BUTTON_CLICK);
             createRoom(roomName);
         });
-        view.getRandomNameButton().addClickHandler(event -> fetchRandomRoomName());
+        // The random-name button only fills the input, so a player can keep clicking
+        // until they see a name they like without creating the room.
+        view.getRandomNameButton().addClickHandler(event ->
+                pickRandomAvailableName(name -> view.getRoomNameInput().setText(name)));
         view.setJoinHandler(room -> {
             if (GameStatus.PLAYING.equals(room.getStatus())) {
                 presenterManager.switchToGameRoom(room);
@@ -93,23 +108,65 @@ public class LobbyPresenter implements Presenter {
         });
     }
 
-    private void fetchRandomRoomName() {
-        RequestBuilder rb = new RequestBuilder(RequestBuilder.GET, "/random-room-name");
+    /**
+     * Picks a random room name that isn't already taken by an existing room and
+     * passes it to {@code onName}. Fetches the full pool of candidate names, removes
+     * the ones currently in use, and chooses randomly from what's left. If every
+     * name is taken, shows a message asking the player to enter one themselves.
+     */
+    private void pickRandomAvailableName(Consumer<String> onName) {
+        fetchRoomNames(allNames -> {
+            Set<String> taken = new HashSet<>();
+            for (Room r : rooms) {
+                if (r.getName() != null) taken.add(r.getName().trim().toLowerCase());
+            }
+            List<String> available = new ArrayList<>();
+            for (String n : allNames) {
+                if (!taken.contains(n.trim().toLowerCase())) available.add(n);
+            }
+            if (available.isEmpty()) {
+                AudioPlayer.errorAlert(I18n.c().errNoRandomRoomNames());
+                return;
+            }
+            onName.accept(available.get(Random.nextInt(available.size())));
+        });
+    }
+
+    private void fetchRoomNames(Consumer<List<String>> onNames) {
+        RequestBuilder rb = new RequestBuilder(RequestBuilder.GET, "/room-names");
         rb.setHeader("Accept", "application/json");
         try {
             rb.sendRequest(null, new RequestCallback() {
                 @Override
                 public void onResponseReceived(Request request, Response response) {
                     if (response.getStatusCode() == 200) {
-                        String name = response.getText().replaceAll(".*\"name\"\\s*:\\s*\"([^\"]+)\".*", "$1");
-                        view.getRoomNameInput().setText(name);
+                        onNames.accept(parseNameArray(response.getText()));
                     }
                 }
-                @Override public void onError(Request request, Throwable exception) {}
+                @Override public void onError(Request request, Throwable exception) {
+                    GWT.log("Failed to fetch room names");
+                }
             });
         } catch (RequestException e) {
-            GWT.log("Failed to fetch random room name: " + e.getMessage());
+            GWT.log("Failed to fetch room names: " + e.getMessage());
         }
+    }
+
+    private List<String> parseNameArray(String json) {
+        List<String> result = new ArrayList<>();
+        try {
+            JSONValue parsed = JSONParser.parseStrict(json);
+            JSONArray arr = parsed.isArray();
+            if (arr != null) {
+                for (int i = 0; i < arr.size(); i++) {
+                    JSONValue v = arr.get(i);
+                    if (v != null && v.isString() != null) result.add(v.isString().stringValue());
+                }
+            }
+        } catch (Exception e) {
+            GWT.log("Failed to parse room names: " + e.getMessage());
+        }
+        return result;
     }
 
     private void updateRoomTable() {

@@ -51,4 +51,11 @@ public class RoomNameController {
     public ResponseEntity<Map<String, String>> getRandomName() {
         return ResponseEntity.ok(Map.of("name", names.get(random.nextInt(names.size()))));
     }
+
+    /** Returns the full pool of candidate room names so the client can pick one
+     * that isn't already taken (retrying until it finds a free name). */
+    @GetMapping("/room-names")
+    public ResponseEntity<List<String>> getAllNames() {
+        return ResponseEntity.ok(names);
+    }
 }
