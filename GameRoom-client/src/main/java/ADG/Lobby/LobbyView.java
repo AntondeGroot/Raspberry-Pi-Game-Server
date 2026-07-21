@@ -47,6 +47,8 @@ public class LobbyView extends Composite {
     }
 
     private Button adminLoginHintButton;
+    private Button adminLogsButton;
+    private Button adminLogoutButton;
 
     private JoinHandler joinHandler;
     private DeleteHandler deleteHandler;
@@ -64,6 +66,17 @@ public class LobbyView extends Composite {
         adminLoginHintButton.setVisible(false);
         adminLoginHintButton.addClickHandler(e -> Window.Location.assign("/login"));
         langSelectorRow.add(adminLoginHintButton);
+        // Admin-only shortcut to the ops logs page; hidden until admin mode is confirmed.
+        adminLogsButton = new Button("🗒 Logs");
+        adminLogsButton.setStylePrimaryName("adminLogsButton");
+        adminLogsButton.setVisible(false);
+        langSelectorRow.add(adminLogsButton);
+        // Logout — same place and styling as the login button; shown only when logged in.
+        // Wired by LobbyPresenter (it POSTs to /logout; POST prevents logout CSRF).
+        adminLogoutButton = new Button("🔓 Logout");
+        adminLogoutButton.setStylePrimaryName("adminLoginHintButton");
+        adminLogoutButton.setVisible(false);
+        langSelectorRow.add(adminLogoutButton);
         langSelectorRow.add(new LanguageSelectorWidget());
         lobbyTitle.setHTML("<h1>" + I18n.c().gameLobby() + "</h1>");
         createRoomTitle.setHTML("<h2 class=\"section-title\">" + I18n.c().createARoom() + "</h2>");
@@ -105,6 +118,16 @@ public class LobbyView extends Composite {
 
     public void setAdminMode(boolean adminMode) {
         this.adminMode = adminMode;
+        adminLogsButton.setVisible(adminMode);
+        adminLogoutButton.setVisible(adminMode);
+    }
+
+    public Button getAdminLogsButton() {
+        return adminLogsButton;
+    }
+
+    public Button getAdminLogoutButton() {
+        return adminLogoutButton;
     }
 
     public void showAdminLoginHintButton() {

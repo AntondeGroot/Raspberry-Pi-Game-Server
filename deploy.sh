@@ -53,6 +53,7 @@ After=network.target
 
 [Service]
 User=ubuntu
+SupplementaryGroups=systemd-journal adm
 ExecStart=/usr/bin/java --add-opens java.base/java.lang=ALL-UNNAMED -jar /opt/gameroom/gameroom.jar
 Restart=on-failure
 
@@ -62,6 +63,17 @@ EOF
   sudo systemctl daemon-reload
   sudo systemctl enable gameroom
 fi"
+
+echo "⚙️ Ensuring log-read permissions (systemd-journal + adm groups)..."
+# Applied via a drop-in so existing installs (whose unit predates this change) also
+# get journald + nginx-log read access for the admin logs page — without clobbering
+# the base unit. New group membership takes effect on the restart below.
+$SSH "sudo mkdir -p /etc/systemd/system/gameroom.service.d && \
+  sudo tee /etc/systemd/system/gameroom.service.d/logs.conf > /dev/null << 'EOF'
+[Service]
+SupplementaryGroups=systemd-journal adm
+EOF
+  sudo systemctl daemon-reload"
 
 echo "🔄 Restarting..."
 $SSH "sudo systemctl restart gameroom"

@@ -4,12 +4,14 @@ games:
       name: Keezen
       baseUrl: http://localhost:4200
       healthUrl: http://localhost:80/keezen/
+      unit: keezen.service
       minPlayers: 2
       maxPlayers: 8
     - id: qwixx
       name: Qwixx
       baseUrl: http://localhost:4300
       healthUrl: http://localhost:80/qwixx/
+      unit: qwixx.service
       minPlayers: 1
       maxPlayers: 5
       embeddedSettings: true

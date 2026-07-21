@@ -47,6 +47,8 @@ public class SecurityConfig {
                 })
             )
             .logout(logout -> logout
+                // POST-only (Spring Security default) to prevent logout CSRF. The lobby's
+                // Logout button POSTs to /logout via XHR, then reloads the lobby.
                 .logoutSuccessUrl("/")
                 .permitAll()
             )
