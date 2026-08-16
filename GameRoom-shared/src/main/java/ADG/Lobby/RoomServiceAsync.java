@@ -25,6 +25,8 @@ public interface RoomServiceAsync {
 
     void startGame(String roomId, AsyncCallback<Room> asyncCallback);
 
+    void endGame(String roomId, AsyncCallback<Void> asyncCallback);
+
     void getAvailableGames(AsyncCallback<ArrayList<GameDefinition>> asyncCallback);
 
     void getGameOptions(String gameId, AsyncCallback<ArrayList<GameOption>> callback);

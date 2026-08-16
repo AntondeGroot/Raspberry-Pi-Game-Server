@@ -31,6 +31,7 @@ public interface AppConstants extends Constants {
     // Room view
     String startGame();
     String rejoinGame();
+    String endGame();
     String gameInProgress();
     String leaveRoom();
     String deleteRoom();
@@ -48,6 +49,7 @@ public interface AppConstants extends Constants {
     String regeneratePassword();
     String editPasswordHint();
     String errPasswordUpdateFailed();
+    String errEndGameFailed();
 
     // Character selection
     String characterSelection();
@@ -78,4 +80,5 @@ public interface AppConstants extends Constants {
     String errProfileTaken();
     String confirmDeleteRoom();
     String confirmLeavePlayingRoom();
+    String confirmEndGame();
 }

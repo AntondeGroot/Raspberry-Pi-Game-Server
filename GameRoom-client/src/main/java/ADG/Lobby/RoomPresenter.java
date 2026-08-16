@@ -93,6 +93,7 @@ public class RoomPresenter implements Presenter {
         roomView.refreshMessages(new ArrayList<>());
         handlerRegistrations.add(roomView.getLeaveRoomButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); leaveRoom(); }));
         handlerRegistrations.add(roomView.getRejoinGameButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); enterGame(); }));
+        handlerRegistrations.add(roomView.getEndGameButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); endGame(); }));
         handlerRegistrations.add(roomView.getDeleteRoomButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); deleteRoom(); }));
         handlerRegistrations.add(roomView.getStartGameButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); startGame(); }));
         handlerRegistrations.add(roomView.getSendMessageButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); sendMessage(); }));
@@ -110,6 +111,7 @@ public class RoomPresenter implements Presenter {
         } else {
             roomView.updateCreatorControls(room);
         }
+        roomView.updateEndGameControl(room);
         handlerRegistrations.add(roomView.getGameSelectorBox().addChangeHandler(event -> onGameSelectorChanged()));
         handlerRegistrations.add(roomView.getOptionsButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); onOptionsButtonClicked(); }));
         handlerRegistrations.add(roomView.getAnyPlayerCanSelectGameCheckbox().addValueChangeHandler(event -> onPermissionChanged()));
@@ -146,6 +148,21 @@ public class RoomPresenter implements Presenter {
                 roomView.updateCreatorControls(room);
             }
         });
+    }
+
+    /**
+     * Ends the running game so the room returns to game selection. The room itself
+     * survives, so the same group can immediately start something else.
+     */
+    private void endGame() {
+        ConfirmDialog.danger(I18n.c().confirmEndGame(), I18n.c().endGame(), () ->
+            roomService.endGame(room.getId(), new AsyncCallback<Void>() {
+                @Override public void onFailure(Throwable t) {
+                    String msg = t instanceof RoomServiceException ? t.getMessage() : I18n.c().errEndGameFailed();
+                    Notify.error(msg);
+                }
+                @Override public void onSuccess(Void v) {} // SSE flips the room back to WAITING
+            }));
     }
 
     private void loadAvailableGamesForRoom() {
@@ -451,6 +468,7 @@ public class RoomPresenter implements Presenter {
         }
 
         roomView.showGameInProgress(nowPlaying);
+        roomView.updateEndGameControl(updatedRoom);
 
         HashMap<String, String> serverUserNames = updatedRoom.getPlayerNames();
         HashMap<String, String> serverUserProfiles = updatedRoom.getPlayerProfiles();

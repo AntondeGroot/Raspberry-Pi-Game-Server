@@ -42,6 +42,9 @@ public class RoomView extends Composite {
     Button rejoinGameButton;
 
     @UiField
+    Button endGameButton;
+
+    @UiField
     HTMLPanel langSelectorRow;
 
     @UiField
@@ -101,6 +104,7 @@ public class RoomView extends Composite {
         initWidget(uiBinder.createAndBindUi(this));
         startGameButton.setText(I18n.c().startGame());
         rejoinGameButton.setText(I18n.c().rejoinGame());
+        endGameButton.setText(I18n.c().endGame());
         leaveRoomButton.setText(I18n.c().leaveRoom());
         deleteRoomButton.setText(I18n.c().deleteRoom());
         sendMessageButton.setText(I18n.c().send());
@@ -130,6 +134,7 @@ public class RoomView extends Composite {
     public Button getDeleteRoomButton() { return deleteRoomButton; }
     public Button getStartGameButton() { return startGameButton; }
     public Button getRejoinGameButton() { return rejoinGameButton; }
+    public Button getEndGameButton() { return endGameButton; }
 
     /**
      * Switches the room between its normal "waiting room" layout and the
@@ -154,6 +159,19 @@ public class RoomView extends Composite {
             leaveRoomButton.setVisible(true);
         }
     }
+    /**
+     * The "End game" action closes the running session so the room drops back to game
+     * selection — the way out of a game nobody is going to finish. It only means anything
+     * while a game is actually running, so it appears for a PLAYING room and only for the
+     * players allowed to configure it: the host, or everyone when the room permits it.
+     */
+    public void updateEndGameControl(Room room) {
+        boolean isCreator = room.getCreatedByUserId() != null
+                && room.getCreatedByUserId().equals(Cookie.getPlayerId());
+        boolean gameRunning = room.getStatus() == GameStatus.PLAYING;
+        endGameButton.setVisible(gameRunning && (isCreator || room.isAnyPlayerCanSetOptions()));
+    }
+
     public HTMLPanel getPlayerPanel() { return playerPanel; }
     public TextArea getMessageDisplayField() { return messageDisplayField; }
     public TextBox getMessageInputField() { return messageInputField; }
