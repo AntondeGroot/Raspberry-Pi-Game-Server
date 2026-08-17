@@ -259,6 +259,46 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
         emitRoomUpdate(room.getId());
     }
 
+    /**
+     * Ends the running game on the host's command and hands the room back to its players,
+     * so they can pick the next game without leaving. Ending a game is a configuration
+     * change like any other, so it follows the room's own option-permission setting: the
+     * creator always may, other players only when the room allows them to set options. It
+     * only applies while a game is running — there is nothing to end in a waiting room.
+     */
+    @Override
+    public synchronized void endGame(String roomId) throws RoomServiceException {
+        String callerId = getPlayerIdFromRequest();
+        Room found = roomStore.rooms.stream()
+                .filter(r -> r.getId().equals(roomId))
+                .findFirst()
+                .orElseThrow(() -> new RoomServiceException("Room not found: " + roomId));
+        boolean isCreator = found.getCreatedByUserId().equals(callerId);
+        if (!isCreator && !found.isAnyPlayerCanSetOptions()) {
+            throw new RoomServiceException("Not authorized to end the game");
+        }
+        if (found.getStatus() != GameStatus.PLAYING) {
+            return;
+        }
+        logger.info("Game in room {} ended by its host", roomId);
+        deleteGameSession(found);
+        resetRoomToWaiting(found);
+        emitLobbyUpdate();
+    }
+
+    /** Best-effort removal of a room's session on the game server; a failure is not fatal. */
+    private void deleteGameSession(Room room) {
+        String sessionId = room.getGameSessionId();
+        if (sessionId == null) return;
+        Optional<GameDefinition> game = gamesConfig.findById(room.getGameId());
+        if (game.isEmpty()) return;
+        try {
+            restTemplate.delete(game.get().getBaseUrl() + "/games/" + sessionId);
+        } catch (RestClientException e) {
+            logger.warn("Failed to delete game session {}: {}", sessionId, e.getMessage());
+        }
+    }
+
     @Override
     public synchronized Room startGame(String roomId) throws RoomServiceException {
         logger.debug("Starting game for room: {}", roomId);
@@ -588,7 +628,7 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
             }
         }
 
-        boolean anyDeleted = false;
+        boolean anyChanged = false;
         for (Room room : playingRooms) {
             if ("Test Room".equals(room.getName())) {
                 continue;
@@ -609,10 +649,10 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
                 gameInfo = restTemplate.getForObject(gameUrl, Map.class);
                 logger.debug("Game session verified: {}", room.getId());
             } catch (RestClientException e) {
-                logger.warn("Game session no longer exists for room {}: {}", room.getId(), e.getMessage());
-                roomStore.deleteRoom(room.getId());
-                sseRegistry.emitClosed(room.getId());
-                anyDeleted = true;
+                logger.warn("Game session no longer exists for room {}: {} — returning the room to the lobby",
+                        room.getId(), e.getMessage());
+                resetRoomToWaiting(room);
+                anyChanged = true;
                 continue;
             }
 
@@ -624,18 +664,14 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
                 // premature: it severs the session link so a restart becomes invisible, and it flips
                 // the room to WAITING where the empty-room reaper can delete it mid-replay. So only
                 // reset when a player has returned (has a live SSE connection); otherwise leave the
-                // room PLAYING and fall through to the staleness check below, which still cleans up a
+                // room PLAYING and fall through to the staleness check below, which releases a
                 // genuinely abandoned finished game after INACTIVE_GAME_TTL_MS. The instant path when
                 // a player uses the game's "leave" button is handled separately by the game-finished
                 // callback. This keeps the fix game-agnostic — it applies to every embedded game.
                 if (sseRegistry.hasSubscribers(room.getId())) {
                     logger.info("Game session finished for room {} and a player is back — resetting to WAITING",
                             room.getId());
-                    room.setStatus(GameStatus.WAITING);
-                    room.setGameSessionId(null);
-                    roomStore.gameStateVersions.remove(room.getId());
-                    roomStore.gameStateVersionTimestamps.remove(room.getId());
-                    emitRoomUpdate(room.getId());
+                    resetRoomToWaiting(room);
                     emitLobbyUpdate();
                     continue;
                 }
@@ -670,18 +706,30 @@ public class RoomServiceImpl extends RemoteServiceServlet implements RoomService
                 Long firstSeenAt = roomStore.gameStateVersionTimestamps.get(room.getId());
                 if (firstSeenAt != null && now - firstSeenAt >= INACTIVE_GAME_TTL_MS) {
                     logger.info("Game state unchanged for 1 hour in room {}, removing stale game", room.getId());
-                    try {
-                        restTemplate.delete(baseUrl + "/games/" + sessionId);
-                    } catch (RestClientException e) {
-                        logger.warn("Failed to delete stale game session {}: {}", sessionId, e.getMessage());
-                    }
-                    roomStore.deleteRoom(room.getId());
-                    sseRegistry.emitClosed(room.getId());
-                    anyDeleted = true;
+                    deleteGameSession(room);
+                    resetRoomToWaiting(room);
+                    anyChanged = true;
                 }
             }
         }
-        if (anyDeleted) emitLobbyUpdate();
+        if (anyChanged) emitLobbyUpdate();
+    }
+
+    /**
+     * Returns a room to the lobby once its game is over. Only the game link is cleared —
+     * the room and its players survive, because the end of a game is not the end of the
+     * evening: the same group can pick another game straight from the same room.
+     *
+     * A room nobody ever comes back to is not leaked: it becomes an ordinary WAITING room
+     * and {@link #deleteInactiveRooms()} reaps it after {@link #EMPTY_ROOM_TTL_MS} without
+     * a single live SSE connection.
+     */
+    private void resetRoomToWaiting(Room room) {
+        room.setStatus(GameStatus.WAITING);
+        room.setGameSessionId(null);
+        roomStore.gameStateVersions.remove(room.getId());
+        roomStore.gameStateVersionTimestamps.remove(room.getId());
+        emitRoomUpdate(room.getId());
     }
 
     /**

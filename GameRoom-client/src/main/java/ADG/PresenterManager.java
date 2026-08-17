@@ -47,14 +47,16 @@ public class PresenterManager {
 
     public void switchToGameOptions(Room room, boolean isAdmin) {
         currentRoom = room;
-        History.newItem("settings=" + room.getId());
+        History.newItem("settings=" + room.getId(), false);
         gameOptionsPresenter = new GameOptionsPresenter(gameOptionsView, room, this, roomServiceAsync, isAdmin);
         switchPresenter(gameOptionsPresenter, gameOptionsView);
     }
 
+    // No history token is pushed here: CharacterSelectionPresenter.start() records its own
+    // ("joining="). Pushing a second token for the same screen would make going back land on
+    // this screen again, which immediately pushes its own token forward — a trap with no way out.
     public void switchToCharacterSelection(Room room){
         currentRoom = room;
-        History.newItem("character=" + room.getId());
         characterSelectionPresenter = new CharacterSelectionPresenter(characterSelectionView, room, this, roomServiceAsync);
         switchPresenter(characterSelectionPresenter, characterSelectionView);
     }

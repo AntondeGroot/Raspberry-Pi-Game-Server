@@ -48,7 +48,7 @@ public class CharacterSelectionPresenter implements Presenter {
 
     @Override
     public void start() {
-        History.newItem("joining=" + room.getId());
+        History.newItem("joining=" + room.getId(), false);
         confirmReg = view.getConfirmButton().addClickHandler(event -> onConfirm());
         cancelReg  = view.getCancelButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); onBackToLobby(); });
         selectedProfileIndex = -1;

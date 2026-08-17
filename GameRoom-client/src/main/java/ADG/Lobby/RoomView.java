@@ -30,6 +30,9 @@ public class RoomView extends Composite {
     HeadingElement roomTitle;
 
     @UiField
+    Button backToLobbyButton;
+
+    @UiField
     Button leaveRoomButton;
 
     @UiField
@@ -40,6 +43,9 @@ public class RoomView extends Composite {
 
     @UiField
     Button rejoinGameButton;
+
+    @UiField
+    Button endGameButton;
 
     @UiField
     HTMLPanel langSelectorRow;
@@ -101,6 +107,8 @@ public class RoomView extends Composite {
         initWidget(uiBinder.createAndBindUi(this));
         startGameButton.setText(I18n.c().startGame());
         rejoinGameButton.setText(I18n.c().rejoinGame());
+        endGameButton.setText(I18n.c().endGame());
+        backToLobbyButton.setText(I18n.c().backToLobby());
         leaveRoomButton.setText(I18n.c().leaveRoom());
         deleteRoomButton.setText(I18n.c().deleteRoom());
         sendMessageButton.setText(I18n.c().send());
@@ -126,10 +134,12 @@ public class RoomView extends Composite {
     public TextBox getPasswordEditInput() { return passwordEditInput; }
     public Button getRegeneratePasswordButton() { return regeneratePasswordButton; }
 
+    public Button getBackToLobbyButton() { return backToLobbyButton; }
     public Button getLeaveRoomButton() { return leaveRoomButton; }
     public Button getDeleteRoomButton() { return deleteRoomButton; }
     public Button getStartGameButton() { return startGameButton; }
     public Button getRejoinGameButton() { return rejoinGameButton; }
+    public Button getEndGameButton() { return endGameButton; }
 
     /**
      * Switches the room between its normal "waiting room" layout and the
@@ -139,6 +149,10 @@ public class RoomView extends Composite {
      * game is not running the rejoin button is hidden and the leave button and
      * game-config panel are restored; the per-player start/delete controls are
      * then set by {@link #updateCreatorControls(Room)}.
+     *
+     * The back-to-lobby button is deliberately left alone here: it is the one way
+     * out that must exist in every state, including a running game where leaving
+     * the room outright is not what the player wants.
      */
     public void showGameInProgress(boolean playing) {
         rejoinGameButton.setVisible(playing);
@@ -154,6 +168,19 @@ public class RoomView extends Composite {
             leaveRoomButton.setVisible(true);
         }
     }
+    /**
+     * The "End game" action closes the running session so the room drops back to game
+     * selection — the way out of a game nobody is going to finish. It only means anything
+     * while a game is actually running, so it appears for a PLAYING room and only for the
+     * players allowed to configure it: the host, or everyone when the room permits it.
+     */
+    public void updateEndGameControl(Room room) {
+        boolean isCreator = room.getCreatedByUserId() != null
+                && room.getCreatedByUserId().equals(Cookie.getPlayerId());
+        boolean gameRunning = room.getStatus() == GameStatus.PLAYING;
+        endGameButton.setVisible(gameRunning && (isCreator || room.isAnyPlayerCanSetOptions()));
+    }
+
     public HTMLPanel getPlayerPanel() { return playerPanel; }
     public TextArea getMessageDisplayField() { return messageDisplayField; }
     public TextBox getMessageInputField() { return messageInputField; }

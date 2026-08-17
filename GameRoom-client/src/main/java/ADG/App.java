@@ -36,6 +36,7 @@ public class App implements EntryPoint {
 		if (Cookie.syncGwtLocale()) {
 			return;
 		}
+		History.addValueChangeHandler(event -> routeTo(event.getValue()));
 		fetchSpriteSheetsConfig();
 	}
 
@@ -93,7 +94,19 @@ public class App implements EntryPoint {
 	}
 
 	private void navigateToInitialPresenter() {
-		String token = History.getToken();
+		routeTo(History.getToken());
+	}
+
+	/**
+	 * Shows the screen a history token names. This runs both for the token the page was
+	 * opened with and for every later token change, so the browser's back and forward
+	 * buttons actually navigate the app. Without it a back press only rewrote the URL
+	 * while the view stayed put, leaving people stranded on whatever screen they were on.
+	 *
+	 * Presenters record their own token with {@code History.newItem(token, false)}: firing
+	 * the event there would route a second time to the screen already being shown.
+	 */
+	private void routeTo(String token) {
 		if (token.startsWith("room=")) {
 			String roomId = token.substring("room=".length());
 			roomService.getRoomById(roomId, new AsyncCallback<Room>() {

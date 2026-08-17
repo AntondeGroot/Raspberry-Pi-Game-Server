@@ -35,7 +35,7 @@ public class LobbyPresenter implements Presenter {
 
     @Override
     public void start() {
-        History.newItem("");
+        History.newItem("", false);
         pendingRejoinRoomId = Window.Location.getParameter("rejoin");
         view.showLoadingRooms();
         checkAdminStatus();

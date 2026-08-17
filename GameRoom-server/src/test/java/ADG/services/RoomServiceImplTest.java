@@ -691,7 +691,7 @@ class RoomServiceImplTest {
     }
 
     @Test
-    void verifyGameSessionsExistDeletesRoomWhenSessionGone() {
+    void verifyGameSessionsExistReturnsRoomToLobbyWhenSessionGone() {
         Room room = buildPlayingRoom("Alpha", "session-1");
         when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
         when(restTemplate.getForObject("http://game-server/games/session-1", Map.class))
@@ -699,7 +699,10 @@ class RoomServiceImplTest {
 
         service.verifyGameSessionsExist();
 
-        assertNull(service.getRoomById(room.getId()));
+        Room updated = service.getRoomById(room.getId());
+        assertNotNull(updated, "the room outlives its game — the group can pick another one");
+        assertEquals(GameStatus.WAITING, updated.getStatus());
+        assertNull(updated.getGameSessionId(), "session ID must be cleared");
     }
 
     @Test
@@ -720,7 +723,7 @@ class RoomServiceImplTest {
     }
 
     @Test
-    void verifyGameSessionsExistDeletesRoomWhenVersionStaleForOneHour() {
+    void verifyGameSessionsExistDeletesStaleGameButKeepsTheRoom() {
         Room room = buildPlayingRoom("Alpha", "session-1");
         when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
         when(restTemplate.getForObject("http://game-server/games/session-1", Map.class))
@@ -731,10 +734,13 @@ class RoomServiceImplTest {
         service.verifyGameSessionsExist(); // stores version "42" with current timestamp
         // Backdate the timestamp to simulate 1+ hour of no change
         roomStore.gameStateVersionTimestamps.put(room.getId(), System.currentTimeMillis() - (61 * 60 * 1000L));
-        service.verifyGameSessionsExist(); // same version, stale → should delete
+        service.verifyGameSessionsExist(); // same version, stale → drop the game, keep the room
 
         verify(restTemplate).delete("http://game-server/games/session-1");
-        assertNull(service.getRoomById(room.getId()));
+        Room updated = service.getRoomById(room.getId());
+        assertNotNull(updated, "only the stale game is removed, not the room");
+        assertEquals(GameStatus.WAITING, updated.getStatus());
+        assertNull(updated.getGameSessionId());
     }
 
     @Test
@@ -835,7 +841,8 @@ class RoomServiceImplTest {
     @Test
     void verifyGameSessionsExistStillReapsAnAbandonedFinishedGameAfterOneHour() {
         // Safety net: a finished game nobody returns to or restarts is still cleaned up after the
-        // inactivity TTL — the fix must not leak such rooms forever.
+        // inactivity TTL — but only the game. The room drops back to WAITING and is left to the
+        // empty-room reaper, so returning players can still start something new in it.
         Room room = buildPlayingRoom("Alpha", "session-1");
         when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
         when(restTemplate.getForObject("http://game-server/games/session-1", Map.class))
@@ -850,7 +857,10 @@ class RoomServiceImplTest {
         service.verifyGameSessionsExist(); // same version, now stale → cleaned up
 
         verify(restTemplate).delete("http://game-server/games/session-1");
-        assertNull(service.getRoomById(room.getId()), "an abandoned finished game is still reaped");
+        Room updated = service.getRoomById(room.getId());
+        assertNotNull(updated, "the abandoned game is reaped, the room itself is not");
+        assertEquals(GameStatus.WAITING, updated.getStatus());
+        assertNull(updated.getGameSessionId());
     }
 
     // ── SSE emit verification ────────────────────────────────────────────────
@@ -1284,6 +1294,79 @@ class RoomServiceImplTest {
 
         verify(sseRegistry).emit(eq(room.getId()), any(Room.class));
         verify(lobbySseRegistry).emit(any());
+    }
+
+    // ── endGame ──────────────────────────────────────────────────────────────
+
+    @Test
+    void endGameByHostClosesTheSessionAndReturnsTheRoomToGameSelection() throws RoomServiceException {
+        Room room = buildPlayingRoom("Alpha", "session-1");
+        when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
+
+        service.endGame(room.getId());
+
+        verify(restTemplate).delete("http://game-server/games/session-1");
+        Room updated = service.getRoomById(room.getId());
+        assertNotNull(updated, "the room stays — the group picks the next game from it");
+        assertEquals(GameStatus.WAITING, updated.getStatus());
+        assertNull(updated.getGameSessionId());
+    }
+
+    @Test
+    void endGameByAnotherPlayerIsRejectedWhenTheRoomKeepsOptionsToTheHost() {
+        Room room = buildPlayingRoom("Alpha", "session-1");
+        room.setAnyPlayerCanSetOptions(false);
+        doReturn("player-2").when(service).getPlayerIdFromRequest();
+
+        assertThrows(RoomServiceException.class, () -> service.endGame(room.getId()));
+
+        verify(restTemplate, never()).delete(anyString());
+        assertEquals(GameStatus.PLAYING, service.getRoomById(room.getId()).getStatus());
+        assertEquals("session-1", service.getRoomById(room.getId()).getGameSessionId());
+    }
+
+    @Test
+    void endGameByAnotherPlayerIsAllowedWhenTheRoomSharesOptions() throws RoomServiceException {
+        Room room = buildPlayingRoom("Alpha", "session-1");
+        room.setAnyPlayerCanSetOptions(true);
+        doReturn("player-2").when(service).getPlayerIdFromRequest();
+        when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
+
+        service.endGame(room.getId());
+
+        verify(restTemplate).delete("http://game-server/games/session-1");
+        assertEquals(GameStatus.WAITING, service.getRoomById(room.getId()).getStatus());
+    }
+
+    @Test
+    void endGameOnAWaitingRoomDoesNothing() throws RoomServiceException {
+        Room room = buildRoom("Alpha");
+        roomStore.rooms.add(room); // WAITING, never started a game
+
+        service.endGame(room.getId());
+
+        verify(restTemplate, never()).delete(anyString());
+        // Nothing was ended, so nobody is told anything — no needless room or lobby refresh.
+        verify(sseRegistry, never()).emit(anyString(), any());
+        verify(lobbySseRegistry, never()).emit(any());
+        assertEquals(GameStatus.WAITING, service.getRoomById(room.getId()).getStatus());
+    }
+
+    @Test
+    void endGameReturnsTheRoomToGameSelectionEvenWhenTheGameServerIsUnreachable() throws RoomServiceException {
+        // The host's way out of a stuck game must not depend on the game server answering —
+        // that is often the very reason the game is stuck.
+        Room room = buildPlayingRoom("Alpha", "session-1");
+        when(gamesConfig.findById("keezen")).thenReturn(Optional.of(gameDefWithBaseUrl("http://game-server")));
+        doThrow(new ResourceAccessException("connection refused"))
+                .when(restTemplate).delete("http://game-server/games/session-1");
+
+        service.endGame(room.getId());
+
+        Room updated = service.getRoomById(room.getId());
+        assertNotNull(updated);
+        assertEquals(GameStatus.WAITING, updated.getStatus());
+        assertNull(updated.getGameSessionId());
     }
 
     // ── startGame guard: no game selected ────────────────────────────────────

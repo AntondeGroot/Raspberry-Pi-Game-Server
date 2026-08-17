@@ -89,6 +89,12 @@
         </executions>
         <configuration>
           <skip>false</skip>
+          <!-- GWT-RPC serializes a thrown exception by reflecting over Throwable's private
+               fields, which the module system forbids from JDK 16 on. Without this, every
+               failing RPC turns into a bare 500 instead of the error message the UI wants
+               to show. The systemd units on the Pi pass the same flag (see setup-pi.sh);
+               this keeps `mvn spring-boot:run` behaving like the real deployment. -->
+          <jvmArguments>--add-opens java.base/java.lang=ALL-UNNAMED</jvmArguments>
         </configuration>
       </plugin>
       <plugin>
