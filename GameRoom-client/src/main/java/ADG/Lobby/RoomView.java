@@ -30,6 +30,9 @@ public class RoomView extends Composite {
     HeadingElement roomTitle;
 
     @UiField
+    Button backToLobbyButton;
+
+    @UiField
     Button leaveRoomButton;
 
     @UiField
@@ -105,6 +108,7 @@ public class RoomView extends Composite {
         startGameButton.setText(I18n.c().startGame());
         rejoinGameButton.setText(I18n.c().rejoinGame());
         endGameButton.setText(I18n.c().endGame());
+        backToLobbyButton.setText(I18n.c().backToLobby());
         leaveRoomButton.setText(I18n.c().leaveRoom());
         deleteRoomButton.setText(I18n.c().deleteRoom());
         sendMessageButton.setText(I18n.c().send());
@@ -130,6 +134,7 @@ public class RoomView extends Composite {
     public TextBox getPasswordEditInput() { return passwordEditInput; }
     public Button getRegeneratePasswordButton() { return regeneratePasswordButton; }
 
+    public Button getBackToLobbyButton() { return backToLobbyButton; }
     public Button getLeaveRoomButton() { return leaveRoomButton; }
     public Button getDeleteRoomButton() { return deleteRoomButton; }
     public Button getStartGameButton() { return startGameButton; }
@@ -144,6 +149,10 @@ public class RoomView extends Composite {
      * game is not running the rejoin button is hidden and the leave button and
      * game-config panel are restored; the per-player start/delete controls are
      * then set by {@link #updateCreatorControls(Room)}.
+     *
+     * The back-to-lobby button is deliberately left alone here: it is the one way
+     * out that must exist in every state, including a running game where leaving
+     * the room outright is not what the player wants.
      */
     public void showGameInProgress(boolean playing) {
         rejoinGameButton.setVisible(playing);

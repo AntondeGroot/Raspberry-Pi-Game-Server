@@ -67,7 +67,7 @@ public class AdminPresenter implements Presenter {
 
     @Override
     public void start() {
-        History.newItem("admin");
+        History.newItem("admin", false);
         renderSegment(view.getLevelSegment(), LEVELS, () -> level, id -> { level = id; reloadWithSegments(); });
         renderSegment(view.getRangeSegment(), RANGES, () -> since, id -> { since = id; reloadWithSegments(); });
         renderHttpSegment();

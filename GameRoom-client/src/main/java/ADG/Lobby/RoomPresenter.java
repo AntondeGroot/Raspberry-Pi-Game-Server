@@ -61,7 +61,7 @@ public class RoomPresenter implements Presenter {
 
     @Override
     public void start() {
-        History.newItem("room=" + room.getId());
+        History.newItem("room=" + room.getId(), false);
         AudioPlayer.play(AudioPlayer.PLAYER_ENTER);
         knownGameId = room.getGameId();
         knownGameOptions = room.getGameOptions() != null ? new HashMap<>(room.getGameOptions()) : new HashMap<>();
@@ -91,6 +91,7 @@ public class RoomPresenter implements Presenter {
         roomView.showRoomName(room.getName());
         roomView.refreshPlayerList(new HashMap<>(), new HashMap<>());
         roomView.refreshMessages(new ArrayList<>());
+        handlerRegistrations.add(roomView.getBackToLobbyButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); backToLobby(); }));
         handlerRegistrations.add(roomView.getLeaveRoomButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); leaveRoom(); }));
         handlerRegistrations.add(roomView.getRejoinGameButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); enterGame(); }));
         handlerRegistrations.add(roomView.getEndGameButton().addClickHandler(event -> { AudioPlayer.play(AudioPlayer.BUTTON_CLICK); endGame(); }));
@@ -333,6 +334,17 @@ public class RoomPresenter implements Presenter {
             sendMessageToServer(inputText);
             roomView.getMessageInputField().setText("");
         }
+    }
+
+    /**
+     * Goes back to the lobby while keeping the player's seat in this room. Browser
+     * history is not a way back here — nothing re-routes on a hash change — so without
+     * this the room is a dead end whenever the state-specific exits are hidden, which
+     * is exactly what happens while a game is running. Unlike {@link #leaveRoom()} it
+     * changes no server state, so the player can walk straight back in.
+     */
+    private void backToLobby() {
+        presenterManager.switchToLobby();
     }
 
     private void leaveRoom() {
